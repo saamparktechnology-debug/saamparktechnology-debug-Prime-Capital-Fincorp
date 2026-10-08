@@ -187,6 +187,7 @@ CREATE TABLE `agent_permissions` (
 
 LOCK TABLES `agent_permissions` WRITE;
 /*!40000 ALTER TABLE `agent_permissions` DISABLE KEYS */;
+/*!40000 ALTER TABLE `agent_permissions` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -217,6 +218,9 @@ CREATE TABLE `agents` (
 --
 
 LOCK TABLES `agents` WRITE;
+/*!40000 ALTER TABLE `agents` DISABLE KEYS */;
+
+/*!40000 ALTER TABLE `agents` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -238,7 +242,7 @@ CREATE TABLE `audit_logs` (
   `ip_address` varchar(45) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`audit_id`)
-) ENGINE=InnoDB AUTO_INCREMENT=114 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=138 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -246,7 +250,6 @@ CREATE TABLE `audit_logs` (
 --
 
 LOCK TABLES `audit_logs` WRITE;
-/*!40000 ALTER TABLE `audit_logs` DISABLE KEYS */;
 /*!40000 ALTER TABLE `audit_logs` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -390,6 +393,7 @@ DROP TABLE IF EXISTS `credit_card_applications`;
 CREATE TABLE `credit_card_applications` (
   `application_id` int NOT NULL AUTO_INCREMENT,
   `card_type` enum('fd','normal') NOT NULL,
+  `bank_id` int DEFAULT NULL,
   `agent_id` int DEFAULT NULL,
   `applied_from_office` tinyint(1) NOT NULL DEFAULT '0',
   `full_name` varchar(255) NOT NULL,
@@ -407,8 +411,10 @@ CREATE TABLE `credit_card_applications` (
   PRIMARY KEY (`application_id`),
   KEY `idx_cc_agent` (`agent_id`),
   KEY `idx_cc_type` (`card_type`),
-  CONSTRAINT `fk_cc_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`agent_id`) ON DELETE SET NULL
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+  KEY `idx_cc_bank` (`bank_id`),
+  CONSTRAINT `fk_cc_agent` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`agent_id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_cc_bank` FOREIGN KEY (`bank_id`) REFERENCES `credit_card_banks` (`bank_id`) ON DELETE RESTRICT
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -417,7 +423,43 @@ CREATE TABLE `credit_card_applications` (
 
 LOCK TABLES `credit_card_applications` WRITE;
 /*!40000 ALTER TABLE `credit_card_applications` DISABLE KEYS */;
+
 /*!40000 ALTER TABLE `credit_card_applications` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `credit_card_banks`
+--
+
+DROP TABLE IF EXISTS `credit_card_banks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `credit_card_banks` (
+  `bank_id` int NOT NULL AUTO_INCREMENT,
+  `bank_name` varchar(255) NOT NULL,
+  `short_code` varchar(20) DEFAULT NULL,
+  `logo_path` varchar(500) DEFAULT NULL,
+  `apply_link` varchar(500) NOT NULL,
+  `tagline` varchar(255) DEFAULT NULL,
+  `target_audience` text NOT NULL,
+  `documents_required` text NOT NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `display_order` int NOT NULL DEFAULT '0',
+  `created_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`bank_id`),
+  UNIQUE KEY `uk_cc_bank_name` (`bank_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `credit_card_banks`
+--
+
+LOCK TABLES `credit_card_banks` WRITE;
+/*!40000 ALTER TABLE `credit_card_banks` DISABLE KEYS */;
+INSERT INTO `credit_card_banks` VALUES (1,'IndusInd Bank Credit Card','INDUSIND',NULL,'https://leads.goldenteam.in/?h=TDBHeTM0eDM1WThaQm1CSG56UDFFSEtTV0hOUmxlK3pmVnphNkdNMjFwbz0=','IndusInd Bank','Age: 21 to 60 years\nEmployment Type: Salaried (Service sector) or Self-Employed (Small business owners)\nAnnual Income: ₹3 Lakhs or more\nCredit Score: 680+ with no negative credit history','Aadhaar Card\nPAN Card\nAddress Proof (Utility bill, Aadhaar, Rent agreement, etc.)\nIncome Proof - Salaried: Latest payslip or last 3 months payslips\nIncome Proof - Self-Employed: Latest ITR with tax computation',1,1,'2026-10-08 04:16:32','2026-10-08 04:16:32'),(2,'Scapia Axis Bank Credit Card',NULL,NULL,'https://leads.goldenteam.in/?h=TnNtN3JHWDdZRVZCQ3o4OXdzeW1DSFdDaUN2UHVuR0tQNWxoR0Y3Z0VVWT0=',NULL,'Age:\n– 21 to 65 years (Salaried)\n– 25 to 65 years (Self-Employed)\n\n Income:\n– ₹18,000/month (Salaried)\n– ₹4 Lakhs/year (Self-Employed)\n\nCustomer Type:\n– New to Bank (NTB) only\n\nRequirement:\n– Must have a regular & stable income\n\nCIBIL Score:\n– Minimum 740+\n– Credit Enquiries: ≤ 5 in the last 180 days\n– No Current DPD (Days Past Due)','Aadhar Card\nPan details and physical pan card for VKYC',1,0,'2026-10-08 05:25:10','2026-10-08 05:25:10');
+/*!40000 ALTER TABLE `credit_card_banks` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -492,6 +534,9 @@ CREATE TABLE `customers` (
 --
 
 LOCK TABLES `customers` WRITE;
+/*!40000 ALTER TABLE `customers` DISABLE KEYS */;
+
+/*!40000 ALTER TABLE `customers` ENABLE KEYS */;
 UNLOCK TABLES;
 
 --
@@ -520,7 +565,7 @@ CREATE TABLE `demat_applications` (
   KEY `idx_demat_bank` (`bank_id`),
   CONSTRAINT `demat_applications_ibfk_1` FOREIGN KEY (`bank_id`) REFERENCES `demat_banks` (`bank_id`) ON DELETE RESTRICT,
   CONSTRAINT `demat_applications_ibfk_2` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`agent_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=4 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -659,7 +704,7 @@ CREATE TABLE `loans` (
   CONSTRAINT `fk_loans_business_type` FOREIGN KEY (`business_type_id`) REFERENCES `business_types` (`type_id`) ON DELETE SET NULL,
   CONSTRAINT `loans_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`customer_id`) ON DELETE RESTRICT,
   CONSTRAINT `loans_ibfk_2` FOREIGN KEY (`agent_id`) REFERENCES `agents` (`agent_id`) ON DELETE RESTRICT
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -668,6 +713,7 @@ CREATE TABLE `loans` (
 
 LOCK TABLES `loans` WRITE;
 /*!40000 ALTER TABLE `loans` DISABLE KEYS */;
+
 /*!40000 ALTER TABLE `loans` ENABLE KEYS */;
 UNLOCK TABLES;
 
@@ -822,4 +868,4 @@ UNLOCK TABLES;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2026-10-04 21:57:07
+-- Dump completed on 2026-10-08 11:12:21
