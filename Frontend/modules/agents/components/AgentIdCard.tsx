@@ -264,7 +264,7 @@ export const AgentIdCard = forwardRef<
             letterSpacing: 1,
           }}
         >
-          <span style={{ whiteSpace: "nowrap" }}>{agentCode}</span>
+          Emp Code:
           <span
             style={{
               fontSize: 20,
@@ -273,7 +273,7 @@ export const AgentIdCard = forwardRef<
               opacity: 0.9,
             }}
           >
-            FINCORP
+            <span style={{ whiteSpace: "nowrap" }}>{agentCode}</span>
           </span>
         </div>
 

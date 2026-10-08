@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "BSA Microfinance",
+  title: "PCF Prime Capital Fincorp",
   description: "Microfinance Management System",
 };
 
