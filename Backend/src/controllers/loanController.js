@@ -8,7 +8,8 @@ const audit = require("../utils/auditLog");
  */
 const createLoan = async (req, res) => {
   const {
-    customer_id,
+    full_name,
+    phone,
     loan_type,
     bank_id,
     requested_amount,
@@ -18,7 +19,7 @@ const createLoan = async (req, res) => {
     purpose,
     aadhaar_number,
     pan_number,
-    // Business fields (optional, required when loan_type = Business)
+    // Business fields
     business_name,
     business_type_id,
     business_category_id,
@@ -43,8 +44,10 @@ const createLoan = async (req, res) => {
     client_pincode,
   } = req.body;
 
+  // ---- Required fields ----
   if (
-    !customer_id ||
+    !full_name ||
+    !phone ||
     !loan_type ||
     !requested_amount ||
     !tenure_months ||
@@ -56,7 +59,7 @@ const createLoan = async (req, res) => {
     return res.status(400).json({
       status: "fail",
       message:
-        "customer_id, loan_type, requested_amount, tenure_months, interest_rate, purpose, aadhaar_number, pan_number are required.",
+        "full_name, phone, loan_type, requested_amount, tenure_months, interest_rate, purpose, aadhaar_number, pan_number are required.",
     });
   }
 
@@ -72,8 +75,8 @@ const createLoan = async (req, res) => {
       .json({ status: "fail", message: "Invalid PAN number." });
   }
 
-  // Business-specific validation
-  const isBusiness = loan_type === "Business";
+  // ---- Business-specific validation ----
+  const isBusiness = loan_type === "Business" || loan_type === "Business Loan";
   if (isBusiness) {
     const requiredBusiness = [
       ["business_name", business_name],
@@ -106,28 +109,12 @@ const createLoan = async (req, res) => {
   }
 
   try {
-    // KYC gate
-    const isKycApproved = await LoanModel.checkCustomerKycApproved(customer_id);
-    if (!isKycApproved) {
-      return res.status(400).json({
-        status: "fail",
-        message:
-          "Loan application denied. Customer KYC must be approved by Admin.",
-      });
-    }
-
-    // Determine agent
+    // ---- Determine agent ----
     let agentId;
     if (req.user.role === "agent") {
       agentId = req.user.id;
     } else if (req.user.role === "admin") {
-      agentId = req.body.agent_id;
-      if (!agentId) {
-        return res.status(400).json({
-          status: "fail",
-          message: "Admin must specify an agent_id for the loan.",
-        });
-      }
+      agentId = req.body.agent_id ?? null; // admin can leave blank
     } else {
       return res
         .status(403)
@@ -136,7 +123,8 @@ const createLoan = async (req, res) => {
 
     const loanId = await LoanModel.create(
       {
-        customer_id,
+        customer_full_name: full_name,
+        customer_phone: phone,
         loan_type,
         bank_id: bank_id || null,
         requested_amount,
@@ -174,7 +162,8 @@ const createLoan = async (req, res) => {
     );
 
     audit(req, "create", "loan", loanId, null, {
-      customer_id,
+      customer_full_name: full_name,
+      customer_phone: phone,
       loan_type,
       requested_amount,
       agent_id: agentId,
@@ -372,7 +361,7 @@ const updateLoanStatusByAdmin = async (req, res) => {
 
           await EMIModel.generateSchedule(
             loanId,
-            loan.customer_id,
+            null, // customer_id no longer required for standalone leads
             loan.tenure_months,
             Number(totalAmount),
             startDate,
@@ -448,7 +437,7 @@ const generateEMISchedule = async (req, res) => {
 
     await EMIModel.generateSchedule(
       loanId,
-      loan.customer_id,
+      null,
       loan.tenure_months,
       Number(totalAmount),
       startDate,

@@ -74,12 +74,16 @@ const createApplication = async (req, res) => {
       });
     }
 
-    // Bank required
-    if (!bank_id) {
-      return res.status(400).json({
-        status: "fail",
-        message: "bank_id is required.",
-      });
+    // Normal credit cards require a partner bank; FD credit cards do NOT.
+    let resolvedBankId = null;
+    if (card_type === "normal") {
+      if (!bank_id) {
+        return res.status(400).json({
+          status: "fail",
+          message: "bank_id is required for normal credit cards.",
+        });
+      }
+      resolvedBankId = Number(bank_id);
     }
 
     if (
@@ -127,7 +131,7 @@ const createApplication = async (req, res) => {
 
     const appId = await CreditCardModel.createApplication({
       card_type,
-      bank_id: Number(bank_id),
+      bank_id: resolvedBankId, // null for FD
       agent_id: assignedAgentId,
       applied_from_office: appliedFromOffice,
       full_name,
@@ -141,7 +145,7 @@ const createApplication = async (req, res) => {
 
     audit(req, "create", "credit_card_application", appId, null, {
       card_type,
-      bank_id: Number(bank_id),
+      bank_id: resolvedBankId,
       agent_id: assignedAgentId,
       applied_from_office: appliedFromOffice,
       full_name,

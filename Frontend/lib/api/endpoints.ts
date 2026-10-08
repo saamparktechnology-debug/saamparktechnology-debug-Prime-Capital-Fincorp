@@ -75,6 +75,14 @@ export const ENDPOINTS = {
         `/credit-cards/applications/${id}/status`,
     },
   },
+  CREDIT_CARD_BANKS: {
+    LIST: "/credit-card-banks",
+    DETAIL: (id: number | string) => `/credit-card-banks/${id}`,
+    CREATE: "/credit-card-banks",
+    UPDATE: (id: number | string) => `/credit-card-banks/${id}`,
+    DELETE: (id: number | string) => `/credit-card-banks/${id}`,
+    UPLOAD_LOGO: (id: number | string) => `/credit-card-banks/${id}/logo`,
+  },
   SAVINGS: {
     BANKS: {
       LIST: "/savings/banks",
@@ -132,15 +140,6 @@ export const ENDPOINTS = {
     DELETE: (id: number | string) => `/banks/${id}`,
     UPLOAD_LOGO: (id: number | string) => `/banks/${id}/logo`,
     REMOVE_LOGO: (id: number | string) => `/banks/${id}/logo`,
-  },
-
-  CREDIT_CARD_BANKS: {
-    LIST: "/credit-card-banks",
-    DETAIL: (id: number | string) => `/credit-card-banks/${id}`,
-    CREATE: "/credit-card-banks",
-    UPDATE: (id: number | string) => `/credit-card-banks/${id}`,
-    DELETE: (id: number | string) => `/credit-card-banks/${id}`,
-    UPLOAD_LOGO: (id: number | string) => `/credit-card-banks/${id}/logo`,
   },
 
   // ---------- Analytics ----------

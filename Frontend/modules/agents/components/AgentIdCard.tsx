@@ -2,28 +2,59 @@
 "use client";
 
 import { forwardRef } from "react";
+import { MapPin } from "lucide-react";
+
 import { documentUrl } from "@/lib/format";
 import type { AgentKyc, CompanyProfile } from "../types/agentKyc";
 
+// CR80 portrait: 54mm × 85.6mm @ 300 DPI
 const CARD_WIDTH_PX = 638;
 const CARD_HEIGHT_PX = 1011;
+const NAVY = "#0b2a5b";
 
-const NAVY = "#0b2e59";
-const TEXT_DARK = "#0f172a";
-const TEXT_MUTED = "#64748b";
-const SLATE_LIGHT = "#cbd5e1";
-const SLATE_BG = "#f1f5f9";
+/** Faint flowing lines behind the photo, like the reference design */
+function WaveLines({ side }: { side: "left" | "right" }) {
+  const count = 22;
+  const lines = Array.from({ length: count }, (_, i) => {
+    const y = (i / (count - 1)) * 300;
+    const tipX = side === "left" ? 150 : 0;
+    const startX = side === "left" ? 0 : 150;
+    const cx = side === "left" ? 60 : 90;
+    return `M${startX},${y} Q${cx},${150 + (y - 150) * 0.15} ${tipX},150`;
+  });
+  return (
+    <svg
+      width="150"
+      height="300"
+      viewBox="0 0 150 300"
+      style={{
+        position: "absolute",
+        top: 0,
+        [side]: 0,
+        pointerEvents: "none",
+      }}
+    >
+      {lines.map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill="none"
+          stroke="#9db8e8"
+          strokeWidth="0.8"
+          opacity="0.55"
+        />
+      ))}
+    </svg>
+  );
+}
 
-export const AgentIdCard = forwardRef<
-  HTMLDivElement,
-  {
-    kyc: AgentKyc;
-    company: CompanyProfile;
-    photoUrl?: string | null;
-  }
->(function AgentIdCard({ kyc, company, photoUrl }, ref) {
-  // Address now comes from COMPANY PROFILE, not agent
-  const companyAddress = [
+/** Fallback: PCF205 + "00" + agent_id, matches backend format */
+const buildAgentCode = (kyc: AgentKyc) =>
+  kyc.agent_code || (kyc.agent_id ? `PCF20500${kyc.agent_id}` : "—");
+
+/** Company address pulled from company_profile */
+const buildCompanyAddress = (company: CompanyProfile) =>
+  [
     company.address_line1,
     company.address_line2,
     company.city,
@@ -33,6 +64,14 @@ export const AgentIdCard = forwardRef<
     .filter(Boolean)
     .join(", ");
 
+export const AgentIdCard = forwardRef<
+  HTMLDivElement,
+  {
+    kyc: AgentKyc;
+    company: CompanyProfile;
+    photoUrl?: string | null;
+  }
+>(function AgentIdCard({ kyc, company, photoUrl }, ref) {
   const initials = (kyc.full_name || "Agent")
     .split(" ")
     .map((n) => n[0])
@@ -42,8 +81,16 @@ export const AgentIdCard = forwardRef<
 
   const logoUrl = documentUrl(company.logo_path);
 
-  // Agent code line — e.g. "PCF205001"
-  const agentCode = kyc.agent_code || "PCF205—";
+  // Split company name: first two words big, the rest smaller below
+  const words = (company.company_name || "").trim().split(/\s+/);
+  const line1 = words.slice(0, 3).join(" ");
+  const line2 = words.slice(2).join(" ");
+
+  const fmt = (d?: string | null) =>
+    d ? new Date(d).toLocaleDateString("en-GB").replace(/\//g, "-") : "—";
+
+  const agentCode = buildAgentCode(kyc);
+  const companyAddress = buildCompanyAddress(company);
 
   return (
     <div
@@ -52,28 +99,42 @@ export const AgentIdCard = forwardRef<
         width: CARD_WIDTH_PX,
         height: CARD_HEIGHT_PX,
         fontFamily: "'Helvetica Neue', Arial, sans-serif",
-        color: TEXT_DARK,
+        color: NAVY,
         backgroundColor: "#ffffff",
-        borderRadius: 16,
-        overflow: "hidden",
+        padding: "0 32px 28px",
         display: "flex",
         flexDirection: "column",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* ---------- Header ---------- */}
+      {/* Header */}
       <div
         style={{
           backgroundColor: NAVY,
+          color: "#fff",
+          marginTop: 72,
+          borderRadius: "28px 28px 0 0",
           padding: "20px 24px",
-          color: "#ffffff",
-          flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 18,
+          height: 150,
         }}
       >
+        {/* Logo tile: light background so dark logos stay visible */}
         <div
           style={{
+            width: 104,
+            height: 104,
+            flexShrink: 0,
+            backgroundColor: "#eef3fb",
+            borderRadius: 22,
+            padding: 8,
             display: "flex",
             alignItems: "center",
-            gap: 12,
+            justifyContent: "center",
+            boxSizing: "border-box",
           }}
         >
           {logoUrl ? (
@@ -81,90 +142,82 @@ export const AgentIdCard = forwardRef<
               src={logoUrl}
               alt="Logo"
               crossOrigin="anonymous"
-              style={{
-                width: 48,
-                height: 48,
-                borderRadius: "50%",
-                backgroundColor: "#ffffff",
-                objectFit: "contain",
-                padding: 4,
-                display: "block",
-              }}
+              style={{ width: "120%", height: "100%", objectFit: "contain" }}
             />
           ) : (
+            <span style={{ fontSize: 34, fontWeight: 800, color: NAVY }}>
+              {initials}
+            </span>
+          )}
+        </div>
+
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              fontSize: line1.length > 12 ? 28 : 38,
+              fontWeight: 800,
+              textTransform: "uppercase",
+              lineHeight: 1.05,
+              letterSpacing: 0.5,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {line1}
+          </div>
+          {line2 && (
             <div
               style={{
-                width: 48,
-                height: 48,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "50%",
-                backgroundColor: "#ffffff",
-                color: NAVY,
-                fontSize: 20,
-                fontWeight: "bold",
+                marginTop: 6,
+                fontSize: 19,
+                fontWeight: 600,
+                textTransform: "uppercase",
+                letterSpacing: 3,
+                whiteSpace: "nowrap",
               }}
             >
-              {initials}
+              {line2}
             </div>
           )}
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <p
-              style={{
-                margin: 0,
-                fontSize: 18,
-                fontWeight: "bold",
-                textTransform: "uppercase",
-                letterSpacing: 1,
-                whiteSpace: "nowrap",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-              }}
-            >
-              {company.company_name}
-            </p>
-            {company.tagline && (
-              <p
-                style={{
-                  margin: "2px 0 0 0",
-                  fontSize: 10,
-                  textTransform: "uppercase",
-                  opacity: 0.9,
-                  whiteSpace: "nowrap",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                }}
-              >
-                {company.tagline}
-              </p>
-            )}
-          </div>
         </div>
       </div>
 
-      {/* ---------- Body ---------- */}
+      {/* Body */}
       <div
         style={{
+          position: "relative",
+          flex: 1,
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          padding: "24px 24px",
-          flex: 1,
+          paddingTop: 22,
         }}
       >
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            left: 0,
+            right: 0,
+            height: 300,
+          }}
+        >
+          <WaveLines side="left" />
+          <WaveLines side="right" />
+        </div>
+
         {/* Photo */}
         <div
           style={{
-            width: 160,
-            height: 192,
+            position: "relative",
+            width: 350,
+            height: 328,
+            border: `4px solid ${NAVY}`,
+            borderRadius: 22,
+            overflow: "hidden",
+            backgroundColor: "#f1f5f9",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            overflow: "hidden",
-            borderRadius: 12,
-            border: `4px solid ${NAVY}`,
-            backgroundColor: SLATE_BG,
           }}
         >
           {photoUrl ? (
@@ -172,186 +225,141 @@ export const AgentIdCard = forwardRef<
               src={photoUrl}
               alt="Photo"
               crossOrigin="anonymous"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-              }}
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
             />
           ) : (
-            <span
-              style={{
-                fontSize: 36,
-                fontWeight: "bold",
-                color: NAVY,
-              }}
-            >
-              {initials}
-            </span>
+            <span style={{ fontSize: 64, fontWeight: 800 }}>{initials}</span>
           )}
         </div>
 
         {/* Name */}
-        <p
+        <div
           style={{
-            margin: "16px 0 0 0",
-            fontSize: 22,
-            fontWeight: "bold",
+            marginTop: 22,
+            fontSize: 40,
+            fontWeight: 800,
             textTransform: "uppercase",
-            letterSpacing: 1,
-            color: NAVY,
             textAlign: "center",
+            letterSpacing: 1,
+            lineHeight: 1.1,
           }}
         >
           {kyc.full_name || "Agent Name"}
-        </p>
+        </div>
 
-        {/* Agent code badge — "AGENT CODE: PCF205001" */}
+        {/* Employee code pill — code + FINCORP on the same line */}
         <div
           style={{
-            marginTop: 8,
-            padding: "6px 16px",
-            borderRadius: 6,
+            marginTop: 14,
+            width: "92%",
             backgroundColor: NAVY,
+            color: "#fff",
+            borderRadius: 12,
+            padding: "10px 14px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            fontSize: 24,
+            fontWeight: 700,
+            letterSpacing: 1,
           }}
         >
-          <p
+          <span style={{ whiteSpace: "nowrap" }}>{agentCode}</span>
+          <span
             style={{
-              margin: 0,
-              fontSize: 13,
-              fontWeight: "bold",
-              letterSpacing: 1,
-              color: "#ffffff",
+              fontSize: 20,
+              fontWeight: 600,
+              letterSpacing: 3,
+              opacity: 0.9,
             }}
           >
-            AGENT CODE: {agentCode}
-          </p>
+            FINCORP
+          </span>
         </div>
 
         {/* Role */}
-        <p
-          style={{
-            margin: "8px 0 0 0",
-            fontSize: 13,
-            fontWeight: 500,
-            color: "#334155",
-          }}
-        >
-          Field Officer
-        </p>
+        <div style={{ marginTop: 10, fontSize: 21, fontWeight: 500 }}>
+          Sales Officer
+        </div>
 
         {/* Divider */}
         <div
           style={{
-            marginTop: 16,
-            height: 1,
-            width: "100%",
-            backgroundColor: SLATE_LIGHT,
+            marginTop: 14,
+            height: 2,
+            width: "92%",
+            backgroundColor: NAVY,
           }}
         />
 
         {/* Dates */}
         <div
           style={{
-            marginTop: 16,
+            marginTop: 12,
+            width: "92%",
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
-            gap: 16,
-            width: "100%",
             textAlign: "center",
           }}
         >
-          <div>
-            <p
+          <div style={{ borderRight: "1px solid #94a3b8" }}>
+            <div style={{ fontSize: 20, fontWeight: 500 }}>Issue Date:</div>
+            <div
               style={{
-                margin: 0,
-                fontSize: 11,
-                color: TEXT_MUTED,
+                marginTop: 4,
+                fontSize: 31,
+                fontWeight: 800,
+                letterSpacing: 1,
               }}
             >
-              Issue Date:
-            </p>
-            <p
-              style={{
-                margin: "4px 0 0 0",
-                fontSize: 15,
-                fontWeight: "bold",
-                color: NAVY,
-              }}
-            >
-              {kyc.issue_date
-                ? new Date(kyc.issue_date).toLocaleDateString("en-GB")
-                : "—"}
-            </p>
+              {fmt(kyc.issue_date)}
+            </div>
           </div>
-          <div
-            style={{
-              borderLeft: `1px solid ${SLATE_LIGHT}`,
-            }}
-          >
-            <p
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 500 }}>Valid Date:</div>
+            <div
               style={{
-                margin: 0,
-                fontSize: 11,
-                color: TEXT_MUTED,
+                marginTop: 4,
+                fontSize: 31,
+                fontWeight: 800,
+                letterSpacing: 1,
               }}
             >
-              Valid Till:
-            </p>
-            <p
-              style={{
-                margin: "4px 0 0 0",
-                fontSize: 15,
-                fontWeight: "bold",
-                color: NAVY,
-              }}
-            >
-              {kyc.valid_till
-                ? new Date(kyc.valid_till).toLocaleDateString("en-GB")
-                : "—"}
-            </p>
+              {fmt(kyc.valid_till)}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ---------- Footer ---------- */}
+      {/* Footer — company address (not agent address) */}
       <div
         style={{
           backgroundColor: NAVY,
-          padding: "16px 24px",
-          color: "#ffffff",
+          color: "#fff",
+          borderRadius: "0 0 28px 28px",
+          padding: "18px 24px",
           display: "flex",
-          alignItems: "flex-start",
-          gap: 12,
-          flexShrink: 0,
+          alignItems: "center",
+          gap: 22,
+          height: 128,
         }}
       >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          style={{ flexShrink: 0, marginTop: 2 }}
-        >
-          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-          <circle cx="12" cy="10" r="3" />
-        </svg>
-        <p
+        <MapPin style={{ width: 44, height: 44, flexShrink: 0 }} />
+        <div
           style={{
-            margin: 0,
-            fontSize: 11,
-            fontWeight: 500,
+            fontSize: 20,
+            fontWeight: 600,
             textTransform: "uppercase",
-            lineHeight: 1.5,
+            lineHeight: 1.35,
+            letterSpacing: 1,
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
+            overflow: "hidden",
           }}
         >
           {companyAddress || "Address not provided"}
-        </p>
+        </div>
       </div>
     </div>
   );

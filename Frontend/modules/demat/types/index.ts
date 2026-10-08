@@ -27,7 +27,7 @@ export type DematStatus = "initiated" | "completed" | "cancelled";
 export interface DematApplication {
   application_id: number;
   bank_id: number;
-  agent_id: number;
+  agent_id: number | null;
   full_name: string;
   aadhaar_number: string | null;
   pan_number: string | null;

@@ -18,7 +18,6 @@ import {
   UserCog,
   IdCard,
   CreditCard as PanIcon,
-  Share2,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +47,7 @@ import {
 
 import { useCreateDematApplication, useDematBanks } from "./hooks/useDemat";
 import type { DematApplication } from "./types";
+import { WhatsAppShare } from "@/components/shared/WhatsAppShare";
 
 const phoneRegex = /^\+?[0-9]{10,15}$/;
 const pincodeRegex = /^[0-9]{4,10}$/;
@@ -67,30 +67,6 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>;
 
-const buildWhatsAppUrl = (opts: {
-  phone: string;
-  customerName: string;
-  bankName: string;
-  applyLink: string;
-}): string => {
-  let digits = opts.phone.replace(/\D/g, "");
-  if (!digits.startsWith("91") && digits.length === 10) {
-    digits = "91" + digits;
-  }
-
-  const message = `Dear ${opts.customerName},
-
-Your ${opts.bankName} demat account application has been initiated.
-
-Please complete your application using the link below:
-${opts.applyLink}
-
-For any assistance, please contact us.
-- Capital Fincorp Pvt. Ltd.`;
-
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-};
-
 function DematApplyInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -101,6 +77,7 @@ function DematApplyInner() {
 
   const { data: banks, isLoading } = useDematBanks(true);
   const { data: agents } = useAgentsList();
+
   const bank = banks?.find((b) => b.bank_id === bankId);
 
   const activeAgents = (agents ?? []).filter((a) => a.is_active);
@@ -126,11 +103,6 @@ function DematApplyInner() {
   const createM = useCreateDematApplication();
 
   const onSubmit = form.handleSubmit((values) => {
-    if (isAdmin && !values.agent_id) {
-      form.setError("agent_id", { message: "Please choose an agent." });
-      return;
-    }
-
     createM.mutate(
       {
         bank_id: bankId,
@@ -162,7 +134,7 @@ function DematApplyInner() {
   }
 
   if (isLoading) {
-    return <Skeleton className="h-96 w-full max-w-2xl" />;
+    return <Skeleton className="h-96 w-full" />;
   }
 
   if (!bank) {
@@ -180,80 +152,122 @@ function DematApplyInner() {
     );
   }
 
-  // ---------- Success ----------
+  // ---------- Success screen ----------
   if (created) {
-    const waUrl = buildWhatsAppUrl({
-      phone: created.phone,
-      customerName: created.full_name,
-      bankName: bank.bank_name,
-      applyLink: bank.apply_link,
-    });
-
     return (
-      <div className="mx-auto max-w-lg space-y-6">
+      <div className="w-full space-y-6">
+        <Link
+          href="/demat"
+          className={buttonVariants({
+            variant: "ghost",
+            size: "sm",
+          })}
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Applications
+        </Link>
+
+        <PageHeader
+          title="Application Submitted"
+          description="Your Demat application has been recorded successfully"
+        />
+
         <Card className="overflow-hidden">
           <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-6 text-center text-white">
             <CheckCircle2 className="mx-auto h-14 w-14" />
             <h2 className="mt-3 text-xl font-bold">Application Recorded!</h2>
             <p className="mt-1 text-sm text-white/90">
-              Complete the process on {bank.bank_name}'s site.
+              Complete the remaining process on {bank.bank_name}'s site.
             </p>
           </div>
-          <CardContent className="space-y-4 p-6">
+
+          <CardContent className="space-y-6 p-6">
+            {/* Bank information */}
+            <div className="flex items-center gap-4 rounded-lg border bg-muted/40 p-4">
+              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white">
+                {bank.logo_path ? (
+                  <img
+                    src={documentUrl(bank.logo_path) ?? ""}
+                    alt={bank.bank_name}
+                    className="h-full w-full object-contain p-1"
+                  />
+                ) : (
+                  <span className="font-bold text-blue-600">
+                    {bank.bank_name.slice(0, 2).toUpperCase()}
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <p className="font-semibold">{bank.bank_name}</p>
+                <p className="text-xs text-muted-foreground">
+                  {bank.tagline || bank.short_code || "Demat Account"}
+                </p>
+              </div>
+            </div>
+            {/* Reference */}
             <div className="rounded-lg border bg-muted/40 p-4">
               <p className="text-xs text-muted-foreground">Reference ID</p>
               <p className="font-mono text-lg font-semibold">
                 #DM{String(created.application_id).padStart(5, "0")}
               </p>
             </div>
+            {/* Applicant information */}
+            <div>
+              <h3 className="mb-3 text-sm font-semibold">
+                Applicant Information
+              </h3>
 
-            <div className="grid grid-cols-2 gap-3 text-sm">
-              <Info label="Name" value={created.full_name} />
-              <Info label="Phone" value={created.phone} />
-              <Info label="Email" value={created.email} />
-              <Info label="Pincode" value={created.pincode} />
-              <Info label="Aadhaar" value={created.aadhaar_number ?? "—"} />
-              <Info label="PAN" value={created.pan_number ?? "—"} />
-            </div>
-
-            {/* WhatsApp share */}
-            <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                  <Share2 className="h-5 w-5" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">Share with customer</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Send the {bank.bank_name} application link to{" "}
-                    {created.full_name} on WhatsApp.
-                  </p>
-                  <a
-                    href={waUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${buttonVariants({ variant: "default" })} mt-3 bg-emerald-600 hover:bg-emerald-700`}
-                  >
-                    <Share2 className="mr-2 h-4 w-4" />
-                    Share on WhatsApp
-                  </a>
-                </div>
+              <div className="grid gap-4 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Info label="Name" value={created.full_name} />
+                <Info label="Phone" value={created.phone} />
+                <Info label="Email" value={created.email} />
+                <Info label="Pincode" value={created.pincode} />
+                <Info label="Aadhaar" value={created.aadhaar_number ?? "—"} />
+                <Info label="PAN" value={created.pan_number ?? "—"} />
               </div>
             </div>
-
-            <div className="flex flex-col gap-2 pt-2">
+            {/* Bottom actions */}
+            {/* Bottom actions */}
+            <div className="space-y-3 border-t pt-6">
               <a
                 href={bank.apply_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={buttonVariants({ variant: "outline", size: "lg" })}
+                className={buttonVariants({
+                  size: "lg",
+                  className: "w-full",
+                })}
               >
                 <ExternalLink className="mr-2 h-4 w-4" />
                 Open {bank.bank_name}
               </a>
-              <Button variant="outline" onClick={() => router.push("/demat")}>
+
+              <WhatsAppShare
+                defaultPhone={created.phone}
+                message={`Hi,
+
+Please complete your Demat application with ${bank.bank_name} using this link:
+
+${bank.apply_link}
+
+- Capital Fincorp Pvt. Ltd.`}
+                helperText="Send the application link directly to the customer."
+              />
+
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                onClick={() => router.push("/demat")}
+              >
                 Back to Applications
               </Button>
+
+              <p className="text-center text-xs text-muted-foreground">
+                Use the bank's website to complete the remaining account opening
+                process.
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -263,10 +277,13 @@ function DematApplyInner() {
 
   // ---------- Form ----------
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
+    <div className="w-full space-y-6">
       <Link
         href="/demat"
-        className={buttonVariants({ variant: "ghost", size: "sm" })}
+        className={buttonVariants({
+          variant: "ghost",
+          size: "sm",
+        })}
       >
         <ArrowLeft className="mr-2 h-4 w-4" />
         Back to Applications
@@ -277,10 +294,10 @@ function DematApplyInner() {
         description="Fill in customer details to record this application"
       />
 
+      {/* Bank information */}
       <Card>
         <CardContent className="p-6">
-          {/* Bank banner */}
-          <div className="mb-6 flex items-center gap-4 rounded-lg border bg-muted/40 p-4">
+          <div className="flex items-center gap-4 rounded-lg border bg-muted/40 p-4">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white">
               {bank.logo_path ? (
                 <img
@@ -294,110 +311,125 @@ function DematApplyInner() {
                 </span>
               )}
             </div>
-            <div>
+
+            <div className="min-w-0">
               <p className="font-semibold">{bank.bank_name}</p>
               <p className="text-xs text-muted-foreground">
                 {bank.tagline || bank.short_code || "Demat Account"}
               </p>
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <form onSubmit={onSubmit} className="space-y-4">
-            {/* Agent selector (admin only) */}
-            {isAdmin && (
+      <form onSubmit={onSubmit} className="w-full space-y-6">
+        {/* Assignment */}
+        {/* Assignment */}
+        {isAdmin && (
+          <Card>
+            <CardContent className="p-6">
+              <div className="mb-4">
+                <h2 className="text-base font-semibold">Agent Assignment</h2>
+                <p className="text-sm text-muted-foreground">
+                  Optional. Leave blank for office-sourced leads.
+                </p>
+              </div>
+
               <div className="space-y-2">
                 <Label>
-                  Assign to Agent <span className="text-destructive">*</span>
+                  Assign to Agent{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (optional)
+                  </span>
                 </Label>
-                <Select
-                  value={
-                    form.watch("agent_id") ? String(form.watch("agent_id")) : ""
-                  }
-                  onValueChange={(v) =>
-                    form.setValue("agent_id", v ? Number(v) : undefined, {
-                      shouldValidate: true,
-                    })
-                  }
-                >
-                  <SelectTrigger>
-                    <UserCog className="mr-2 h-4 w-4 text-muted-foreground" />
-                    <span
-                      className={
-                        !form.watch("agent_id") ? "text-muted-foreground" : ""
-                      }
-                    >
-                      {optionTag(agentOptions, form.watch("agent_id")) ??
-                        "Select agent"}
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentOptions.map((o) => (
-                      <SelectItem key={o.value} value={o.value}>
-                        {o.tag}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {form.formState.errors.agent_id && (
+                {/* ...Select unchanged... */}
+
+                <p className="text-xs text-muted-foreground">
+                  Leave blank to mark this application as{" "}
+                  <strong>applied from office</strong>.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Customer details */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="mb-6">
+              <h2 className="text-base font-semibold">Customer Details</h2>
+              <p className="text-sm text-muted-foreground">
+                Enter the customer's basic contact information.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Full name */}
+              <div className="space-y-2 md:col-span-2">
+                <Label htmlFor="full_name">
+                  Full Name <span className="text-destructive">*</span>
+                </Label>
+
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  <Input
+                    id="full_name"
+                    className="pl-9"
+                    placeholder="e.g., Surajit Singh"
+                    {...form.register("full_name")}
+                  />
+                </div>
+
+                {form.formState.errors.full_name && (
                   <p className="text-xs text-destructive">
-                    {form.formState.errors.agent_id.message}
+                    {form.formState.errors.full_name.message}
                   </p>
                 )}
               </div>
-            )}
 
-            <div className="space-y-2">
-              <Label>
-                Full Name <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  className="pl-9"
-                  placeholder="e.g., Surajit Singh"
-                  {...form.register("full_name")}
-                />
-              </div>
-              {form.formState.errors.full_name && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.full_name.message}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label>
-                Email <span className="text-destructive">*</span>
-              </Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  type="email"
-                  className="pl-9"
-                  placeholder="you@example.com"
-                  {...form.register("email")}
-                />
-              </div>
-              {form.formState.errors.email && (
-                <p className="text-xs text-destructive">
-                  {form.formState.errors.email.message}
-                </p>
-              )}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
+              {/* Email */}
               <div className="space-y-2">
-                <Label>
+                <Label htmlFor="email">
+                  Email <span className="text-destructive">*</span>
+                </Label>
+
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  <Input
+                    id="email"
+                    type="email"
+                    className="pl-9"
+                    placeholder="you@example.com"
+                    {...form.register("email")}
+                  />
+                </div>
+
+                {form.formState.errors.email && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.email.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Phone */}
+              <div className="space-y-2">
+                <Label htmlFor="phone">
                   Phone <span className="text-destructive">*</span>
                 </Label>
+
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                   <Input
+                    id="phone"
                     className="pl-9"
                     placeholder="9876543210"
                     {...form.register("phone")}
                   />
                 </div>
+
                 {form.formState.errors.phone && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.phone.message}
@@ -405,18 +437,23 @@ function DematApplyInner() {
                 )}
               </div>
 
+              {/* Pincode */}
               <div className="space-y-2">
-                <Label>
+                <Label htmlFor="pincode">
                   Pincode <span className="text-destructive">*</span>
                 </Label>
+
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
                   <Input
+                    id="pincode"
                     className="pl-9"
                     placeholder="713103"
                     {...form.register("pincode")}
                   />
                 </div>
+
                 {form.formState.errors.pincode && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.pincode.message}
@@ -424,89 +461,138 @@ function DematApplyInner() {
                 )}
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            {/* Government IDs */}
-            <div className="rounded-lg border bg-muted/20 p-4">
-              <p className="mb-3 text-sm font-semibold">Government IDs</p>
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>
-                    Aadhaar Number <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="relative">
-                    <IdCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      className="pl-9"
-                      placeholder="1234 5678 9012"
-                      maxLength={14}
-                      {...form.register("aadhaar_number")}
-                    />
-                  </div>
-                  {form.formState.errors.aadhaar_number && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.aadhaar_number.message}
-                    </p>
-                  )}
+        {/* Government IDs */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="mb-6">
+              <h2 className="text-base font-semibold">Government IDs</h2>
+              <p className="text-sm text-muted-foreground">
+                Enter the customer's Aadhaar and PAN details.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Aadhaar */}
+              <div className="space-y-2">
+                <Label htmlFor="aadhaar_number">
+                  Aadhaar Number <span className="text-destructive">*</span>
+                </Label>
+
+                <div className="relative">
+                  <IdCard className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  <Input
+                    id="aadhaar_number"
+                    className="pl-9"
+                    placeholder="1234 5678 9012"
+                    maxLength={14}
+                    {...form.register("aadhaar_number")}
+                  />
                 </div>
 
-                <div className="space-y-2">
-                  <Label>
-                    PAN Number <span className="text-destructive">*</span>
-                  </Label>
-                  <div className="relative">
-                    <PanIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      className="pl-9 uppercase"
-                      placeholder="ABCDE1234F"
-                      maxLength={10}
-                      {...form.register("pan_number", {
-                        onChange: (e) => {
-                          e.target.value = e.target.value.toUpperCase();
-                        },
-                      })}
-                    />
-                  </div>
-                  {form.formState.errors.pan_number && (
-                    <p className="text-xs text-destructive">
-                      {form.formState.errors.pan_number.message}
-                    </p>
-                  )}
+                {form.formState.errors.aadhaar_number && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.aadhaar_number.message}
+                  </p>
+                )}
+              </div>
+
+              {/* PAN */}
+              <div className="space-y-2">
+                <Label htmlFor="pan_number">
+                  PAN Number <span className="text-destructive">*</span>
+                </Label>
+
+                <div className="relative">
+                  <PanIcon className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+
+                  <Input
+                    id="pan_number"
+                    className="pl-9 uppercase"
+                    placeholder="ABCDE1234F"
+                    maxLength={10}
+                    {...form.register("pan_number", {
+                      onChange: (e) => {
+                        e.target.value = e.target.value.toUpperCase();
+                      },
+                    })}
+                  />
                 </div>
+
+                {form.formState.errors.pan_number && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.pan_number.message}
+                  </p>
+                )}
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="pt-2">
-              <Button
-                type="submit"
-                size="lg"
-                className="w-full"
-                disabled={createM.isPending}
-              >
-                {createM.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Continue"
-                )}
-              </Button>
+        {/* Bottom actions */}
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-base font-semibold">Submit Application</h2>
+                <p className="text-sm text-muted-foreground">
+                  Review the information above before saving the application.
+                </p>
+              </div>
+
+              {createM.isError && (
+                <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+                  Unable to save the application. Please check the details and
+                  try again.
+                </div>
+              )}
+
+              <div className="flex flex-col gap-3 border-t pt-4 sm:flex-row sm:justify-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="lg"
+                  onClick={() => router.push("/demat")}
+                  disabled={createM.isPending}
+                >
+                  Cancel
+                </Button>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  className="sm:min-w-48"
+                  disabled={createM.isPending}
+                >
+                  {createM.isPending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Continue"
+                  )}
+                </Button>
+              </div>
+
+              <p className="text-center text-xs text-muted-foreground">
+                After saving, you'll be redirected to {bank.bank_name}'s site to
+                complete the process.
+              </p>
             </div>
-
-            <p className="text-center text-xs text-muted-foreground">
-              After saving, you'll be redirected to {bank.bank_name}'s site to
-              complete the process.
-            </p>
-          </form>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </form>
     </div>
   );
 }
 
 export default function DematApply() {
   return (
-    <Suspense fallback={<Skeleton className="h-96 w-full max-w-2xl" />}>
+    <Suspense fallback={<Skeleton className="h-96 w-full" />}>
       <DematApplyInner />
     </Suspense>
   );

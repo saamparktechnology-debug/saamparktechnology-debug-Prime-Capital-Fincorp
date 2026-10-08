@@ -1,5 +1,3 @@
-// modules/credit-cards/types/index.ts
-
 export type CardType = "fd" | "normal";
 export type CCStatus = "initiated" | "completed" | "cancelled";
 
@@ -8,7 +6,7 @@ export interface CreditCardApplication {
   card_type: CardType;
   bank_id: number | null;
   agent_id: number | null;
-  applied_from_office: number;
+  applied_from_office: number; // 0 or 1
   full_name: string;
   email: string;
   phone: string;
@@ -26,13 +24,16 @@ export interface CreditCardApplication {
   bank_short_code?: string | null;
   bank_logo_path?: string | null;
   bank_apply_link?: string | null;
+  bank_tagline?: string | null;
+  bank_target_audience?: string | null;
+  bank_documents_required?: string | null;
   agent_name?: string | null;
   agent_email?: string | null;
 }
 
 export interface CreateCreditCardApplicationPayload {
   card_type: CardType;
-  bank_id: number; // required
+  bank_id?: number | null; // required for "normal", ignored for "fd"
   agent_id?: number | null;
   full_name: string;
   email: string;
@@ -67,7 +68,7 @@ export interface CcDocumentChecklist {
   uploaded_count: number;
   total_required: number;
 }
-
+// ---------- Credit Card Bank (master) ----------
 export interface CreditCardBank {
   bank_id: number;
   bank_name: string;

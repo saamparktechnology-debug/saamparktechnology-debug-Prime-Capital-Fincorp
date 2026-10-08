@@ -1,18 +1,16 @@
-// modules/credit-cards/CreditCardApply.tsx
 "use client";
 
-import { Suspense, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { documentUrl } from "@/lib/format";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Loader2,
   CheckCircle2,
   ArrowLeft,
+  ArrowRight,
   User,
-  Users,
   Mail,
   Phone,
   MapPin,
@@ -22,10 +20,8 @@ import {
   Landmark,
   CreditCard as CreditCardIcon,
   Building2,
-  Share2,
   FileText,
-  ArrowRight,
-  ExternalLink,
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -60,57 +56,40 @@ import { useCreateCreditCardApplication } from "./hooks/useCreditCards";
 import { cardTypeLabel } from "./utils/cardTypes";
 import type { CardType, CreditCardApplication } from "./types";
 import { CcDocumentStep } from "./components/CcDocumentStep";
+import { WhatsAppShare } from "@/components/shared/WhatsAppShare";
 
 const phoneRegex = /^\+?[0-9]{10,15}$/;
 const pincodeRegex = /^[0-9]{4,10}$/;
 
-const schema = z.object({
-  card_type: z.enum(["fd", "normal"]),
-  bank_id: z.number({ message: "Please select a bank" }),
-  full_name: z.string().min(2, "Full name is required"),
-  email: z.string().email("Enter a valid email"),
-  phone: z.string().regex(phoneRegex, "Enter a valid phone"),
-  aadhaar_number: z.string().regex(AADHAAR_REGEX, AADHAAR_ERROR),
-  pan_number: z
-    .string()
-    .transform((v) => v.toUpperCase())
-    .refine((v) => PAN_REGEX.test(v), PAN_ERROR),
-  pincode: z.string().regex(pincodeRegex, "Enter a valid pincode"),
-  agent_id: z.number().optional(),
-});
+const schema = z
+  .object({
+    card_type: z.enum(["fd", "normal"]),
+    bank_id: z.number().optional(),
+    full_name: z.string().min(2, "Full name is required"),
+    email: z.string().email("Enter a valid email"),
+    phone: z.string().regex(phoneRegex, "Enter a valid phone"),
+    aadhaar_number: z.string().regex(AADHAAR_REGEX, AADHAAR_ERROR),
+    pan_number: z
+      .string()
+      .transform((v) => v.toUpperCase())
+      .refine((v) => PAN_REGEX.test(v), PAN_ERROR),
+    pincode: z.string().regex(pincodeRegex, "Enter a valid pincode"),
+    agent_id: z.number().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.card_type === "normal" && !data.bank_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["bank_id"],
+        message: "Please choose a bank.",
+      });
+    }
+  });
 
 type FormValues = z.infer<typeof schema>;
 
 /* ------------------------------------------------------------------ */
-/* WhatsApp helper                                                    */
-/* ------------------------------------------------------------------ */
-
-const buildWhatsAppUrl = (opts: {
-  phone: string;
-  customerName: string;
-  bankName: string;
-  applyLink: string;
-}): string => {
-  let digits = opts.phone.replace(/\D/g, "");
-  if (!digits.startsWith("91") && digits.length === 10) {
-    digits = "91" + digits;
-  }
-
-  const message = `Dear ${opts.customerName},
-
-Your ${opts.bankName} credit card application has been initiated.
-
-Please complete your application using the link below:
-${opts.applyLink}
-
-For any assistance, please contact us.
-- Capital Fincorp Pvt. Ltd.`;
-
-  return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
-};
-
-/* ------------------------------------------------------------------ */
-/* Shared components                                                  */
+/* Step indicator                                                      */
 /* ------------------------------------------------------------------ */
 
 function StepIndicator({
@@ -121,44 +100,96 @@ function StepIndicator({
   steps: { n: number; label: string }[];
 }) {
   return (
-    <div className="flex items-center justify-center gap-2 py-2">
-      {steps.map((step, index) => {
-        const done = current > step.n;
-        const active = current === step.n;
+    <nav aria-label="Application progress" className="w-full">
+      <ol className="flex w-full items-center">
+        {steps.map((step, index) => {
+          const done = current > step.n;
+          const active = current === step.n;
 
-        return (
-          <div key={step.n} className="flex items-center gap-2">
-            <div
-              className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold transition-colors ${
-                done || active
-                  ? "bg-blue-600 text-white"
-                  : "border bg-background text-muted-foreground"
-              } ${active ? "ring-4 ring-blue-500/20" : ""}`}
-            >
-              {done ? <CheckCircle2 className="h-4 w-4" /> : step.n}
-            </div>
-
-            <span
-              className={`hidden text-xs font-medium sm:inline ${
-                active
-                  ? "font-semibold text-foreground"
-                  : "text-muted-foreground"
+          return (
+            <li
+              key={step.n}
+              className={`flex items-center ${
+                index < steps.length - 1 ? "flex-1" : ""
               }`}
+              aria-current={active ? "step" : undefined}
             >
-              {step.label}
-            </span>
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold transition-colors ${
+                    done || active
+                      ? "bg-blue-600 text-white"
+                      : "border bg-background text-muted-foreground"
+                  } ${active ? "ring-4 ring-blue-500/20" : ""}`}
+                >
+                  {done ? <CheckCircle2 className="h-4 w-4" /> : step.n}
+                </span>
 
-            {index < steps.length - 1 && (
-              <div
-                className={`h-0.5 w-8 transition-colors ${
-                  done ? "bg-blue-600" : "bg-muted"
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
+                <span
+                  className={`hidden text-sm sm:inline ${
+                    active
+                      ? "font-semibold text-foreground"
+                      : "font-medium text-muted-foreground"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+
+              {index < steps.length - 1 && (
+                <div
+                  className={`mx-3 h-px flex-1 transition-colors ${
+                    done ? "bg-blue-600" : "bg-border"
+                  }`}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Reusable bits                                                       */
+/* ------------------------------------------------------------------ */
+
+function SectionCard({
+  icon: Icon,
+  title,
+  description,
+  children,
+}: {
+  icon: typeof User;
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="overflow-hidden">
+      <CardHeader className="flex flex-row items-center gap-3 space-y-0 bg-muted/30 py-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <Icon className="h-4 w-4" />
+        </div>
+
+        <div className="min-w-0">
+          <CardTitle className="text-base leading-tight">{title}</CardTitle>
+
+          {description && (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {description}
+            </p>
+          )}
+        </div>
+      </CardHeader>
+
+      <Separator />
+
+      <CardContent className="grid gap-5 p-5 sm:grid-cols-2 lg:p-6">
+        {children}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -228,7 +259,7 @@ function Info({ label, value }: { label: string; value: string }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Main page                                                          */
+/* Main page                                                           */
 /* ------------------------------------------------------------------ */
 
 function CreditCardApplyInner() {
@@ -236,32 +267,33 @@ function CreditCardApplyInner() {
   const router = useRouter();
   const { isAdmin } = usePermission();
 
-  const initialType = (searchParams.get("type") as CardType) || "normal";
+  const queryType = searchParams.get("type");
+  const initialType: CardType =
+    queryType === "fd" || queryType === "normal" ? queryType : "normal";
 
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [created, setCreated] = useState<CreditCardApplication | null>(null);
 
   const { data: agents } = useAgentsList();
-  const { data: banks, isLoading: loadingBanks } = useCreditCardBanks(true);
+  const { data: banks, isLoading: banksLoading } = useCreditCardBanks(true);
 
   const activeAgents = (agents ?? []).filter((agent) => agent.is_active);
-  const activeBanks = (banks ?? []).filter((bank) => bank.is_active);
 
   const agentOptions: SelectOption[] = activeAgents.map((agent) => ({
     value: String(agent.agent_id),
     tag: agent.full_name,
   }));
 
-  const bankOptions: SelectOption[] = activeBanks.map((bank) => ({
-    value: String(bank.bank_id),
-    tag: `${bank.bank_name}${bank.short_code ? ` (${bank.short_code})` : ""}`,
+  const bankOptions: SelectOption[] = (banks ?? []).map((b) => ({
+    value: String(b.bank_id),
+    tag: b.bank_name,
   }));
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
       card_type: initialType,
-      bank_id: undefined as any,
+      bank_id: undefined,
       full_name: "",
       email: "",
       phone: "",
@@ -270,20 +302,22 @@ function CreditCardApplyInner() {
       pincode: "",
       agent_id: undefined,
     },
+    mode: "onSubmit",
   });
 
   const createM = useCreateCreditCardApplication();
 
-  const selectedCardType = form.watch("card_type");
+  const selectedCardType = form.watch("card_type") ?? initialType;
   const selectedBankId = form.watch("bank_id");
-  const selectedAgentId = form.watch("agent_id");
-  const selectedAgent = (agents ?? []).find(
-    (a) => a.agent_id === selectedAgentId,
-  );
   const isFd = selectedCardType === "fd";
-
-  const selectedBank = (banks ?? []).find((b) => b.bank_id === selectedBankId);
   const errors = form.formState.errors;
+
+  // Sync card_type if URL changes after mount (e.g. client-side navigation)
+  useEffect(() => {
+    form.setValue("card_type", initialType);
+    if (initialType === "fd") form.setValue("bank_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialType]);
 
   const steps = isFd
     ? [
@@ -296,16 +330,20 @@ function CreditCardApplyInner() {
         { n: 3, label: "Done" },
       ];
 
-  const onSubmitStep1 = form.handleSubmit((values) => {
-    if (!values.bank_id) {
-      form.setError("bank_id", { message: "Please select a bank." });
-      return;
+  const handleCardTypeChange = (value: CardType) => {
+    form.setValue("card_type", value, { shouldValidate: true });
+    if (value === "fd") {
+      form.setValue("bank_id", undefined, { shouldValidate: true });
+    } else {
+      form.setValue("bank_id", undefined, { shouldValidate: true });
     }
+  };
 
+  const onSubmitStep1 = form.handleSubmit((values) => {
     createM.mutate(
       {
         card_type: values.card_type,
-        bank_id: values.bank_id,
+        bank_id: values.card_type === "normal" ? values.bank_id : undefined,
         full_name: values.full_name,
         email: values.email,
         phone: values.phone,
@@ -317,21 +355,16 @@ function CreditCardApplyInner() {
       {
         onSuccess: (data) => {
           setCreated(data);
-          if (data.card_type === "fd") {
-            setCurrentStep(2);
-          } else {
-            setCurrentStep(3);
-          }
+          setCurrentStep(data.card_type === "fd" ? 2 : 3);
         },
       },
     );
   });
 
   /* ---------------------------------------------------------------- */
-  /* Step 3 — Success                                                */
+  /* Step 3 — Success                                                 */
   /* ---------------------------------------------------------------- */
 
-  // ---------- Step 3: Success ----------
   if (currentStep === 3 && created) {
     const doneSteps =
       created.card_type === "fd"
@@ -345,46 +378,33 @@ function CreditCardApplyInner() {
             { n: 3, label: "Done" },
           ];
 
-    // Debug logging — remove after confirming
-    console.log("[CC Success] bank data:", {
-      bank_name: created.bank_name,
-      bank_id: created.bank_id,
-      bank_short_code: created.bank_short_code,
-      bank_apply_link: created.bank_apply_link,
-    });
-
-    const waUrl = created.bank_apply_link
-      ? buildWhatsAppUrl({
-          phone: created.phone,
-          customerName: created.full_name,
-          bankName: created.bank_name || "partner bank",
-          applyLink: created.bank_apply_link,
-        })
-      : null;
-
     return (
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+      <div className="w-full space-y-6">
         <StepIndicator current={3} steps={doneSteps} />
 
-        <Card className="overflow-hidden">
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 p-6 text-center text-white">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10">
-              <CheckCircle2 className="h-8 w-8" />
+        <Card className="overflow-hidden shadow-sm">
+          <div className="flex flex-col items-center gap-3 bg-gradient-to-br from-emerald-500 to-emerald-700 px-6 py-10 text-center text-white">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/15 ring-8 ring-white/10">
+              <CheckCircle2 className="h-9 w-9" />
             </div>
 
-            <h2 className="mt-3 text-xl font-bold">Application submitted</h2>
+            <div className="space-y-1">
+              <h2 className="text-2xl font-semibold tracking-tight">
+                Application submitted
+              </h2>
 
-            <p className="mt-1 text-sm text-white/90">
-              Share the bank link with your customer to complete the process.
-            </p>
+              <p className="text-sm text-white/85">
+                We&apos;ll process this credit card request shortly.
+              </p>
+            </div>
           </div>
 
-          <CardContent className="space-y-5 p-6">
-            {/* Reference */}
-            <div className="flex flex-col gap-3 rounded-lg border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <CardContent className="space-y-6 p-6 lg:p-8">
+            <div className="flex flex-col gap-3 rounded-xl border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">Reference ID</p>
-                <p className="font-mono text-lg font-semibold">
+
+                <p className="font-mono text-xl font-semibold tabular-nums">
                   #CC{String(created.application_id).padStart(5, "0")}
                 </p>
               </div>
@@ -394,86 +414,52 @@ function CreditCardApplyInner() {
               </Badge>
             </div>
 
-            {/* Applicant details */}
             <div>
               <h3 className="mb-3 text-sm font-semibold">Applicant details</h3>
 
               <Separator />
 
-              <div className="grid grid-cols-2 gap-x-6 gap-y-4 pt-4 sm:grid-cols-3">
+              <div className="grid grid-cols-1 gap-x-8 gap-y-5 pt-5 sm:grid-cols-2 lg:grid-cols-3">
                 <Info label="Name" value={created.full_name} />
                 <Info label="Phone" value={created.phone} />
                 <Info label="Email" value={created.email} />
-                <Info label="Bank" value={created.bank_name ?? "—"} />
                 <Info label="Pincode" value={created.pincode} />
                 <Info label="Aadhaar" value={created.aadhaar_number ?? "—"} />
                 <Info label="PAN" value={created.pan_number ?? "—"} />
+                {created.bank_name ? (
+                  <Info label="Bank" value={created.bank_name} />
+                ) : null}
               </div>
             </div>
 
-            {/* Applied from office badge */}
             {created.applied_from_office ? (
-              <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-center text-xs text-amber-700 dark:text-amber-400">
-                <Building2 className="mx-auto mb-1 h-4 w-4" />
+              <div className="flex items-center gap-3 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">
+                <Building2 className="h-4 w-4 shrink-0" />
                 Applied from office — no agent assigned
               </div>
             ) : null}
 
-            {/* Apply link + WhatsApp share */}
-            {created.bank_apply_link ? (
-              <div className="space-y-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600">
-                    <Landmark className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">
-                      {created.bank_name} — Application Link
-                    </p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Open the bank&apos;s site or share it with the customer.
-                    </p>
-                  </div>
-                </div>
+            {/* WhatsApp share — only for normal cards with a bank apply link */}
+            {created.card_type === "normal" &&
+              created.bank_name &&
+              created.bank_apply_link && (
+                <WhatsAppShare
+                  defaultPhone={created.phone}
+                  message={`Hi,\n\nPlease complete your ${created.bank_name} credit card application using this link:\n\n${created.bank_apply_link}\n\n- Capital Fincorp Pvt. Ltd.`}
+                  helperText="Send the application link directly to the customer."
+                />
+              )}
 
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <a
-                    href={created.bank_apply_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={`${buttonVariants({ variant: "default" })} flex-1`}
-                  >
-                    <ExternalLink className="mr-2 h-4 w-4" />
-                    Open {created.bank_name} Site
-                  </a>
+            <Separator />
 
-                  {waUrl && (
-                    <a
-                      href={waUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`${buttonVariants({ variant: "default" })} flex-1 bg-emerald-600 hover:bg-emerald-700`}
-                    >
-                      <Share2 className="mr-2 h-4 w-4" />
-                      Share on WhatsApp
-                    </a>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-dashed p-4 text-center text-xs text-muted-foreground">
-                No application link available for{" "}
-                {created.bank_name ?? "this bank"}.
-              </div>
-            )}
+            <Separator />
 
-            {/* Back */}
-            <div className="flex flex-col gap-2 pt-2 sm:flex-row sm:justify-center">
+            <div className="flex justify-end">
               <Button
                 variant="outline"
                 onClick={() => router.push("/credit-cards")}
               >
-                Back to Applications
+                Back to applications
               </Button>
             </div>
           </CardContent>
@@ -483,12 +469,12 @@ function CreditCardApplyInner() {
   }
 
   /* ---------------------------------------------------------------- */
-  /* Step 2 — Documents                                              */
+  /* Step 2 — Documents                                               */
   /* ---------------------------------------------------------------- */
 
   if (currentStep === 2 && created) {
     return (
-      <div className="mx-auto w-full max-w-4xl space-y-4">
+      <div className="w-full space-y-6">
         <StepIndicator current={2} steps={steps} />
 
         <CcDocumentStep
@@ -501,7 +487,7 @@ function CreditCardApplyInner() {
   }
 
   /* ---------------------------------------------------------------- */
-  /* Step 1 — Form                                                   */
+  /* Step 1 — Details                                                 */
   /* ---------------------------------------------------------------- */
 
   const TypeIcon = isFd ? Landmark : CreditCardIcon;
@@ -511,9 +497,8 @@ function CreditCardApplyInner() {
     : "bg-blue-500/10 text-blue-600 dark:text-blue-400";
 
   return (
-    <div className="w-full space-y-5 sm:space-y-6">
-      {/* Back */}
-      <div>
+    <div className="w-full space-y-6">
+      <div className="flex items-center justify-between gap-4">
         <Link
           href="/credit-cards"
           className={buttonVariants({
@@ -522,30 +507,21 @@ function CreditCardApplyInner() {
           })}
         >
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Applications
+          Back to applications
         </Link>
       </div>
 
-      {/* Header */}
       <PageHeader
-        title="New Credit Card Application"
-        description="Fill in customer details to record this application"
+        title="New credit card application"
+        description="Enter the customer's details to record this application."
       />
 
-      {/* Progress */}
       <StepIndicator current={1} steps={steps} />
 
-      <form
-        onSubmit={onSubmitStep1}
-        noValidate
-        className="space-y-5 sm:space-y-6"
-      >
-        {/* ====================================================== */}
-        {/* Card Type                                               */}
-        {/* ====================================================== */}
-
+      <form onSubmit={onSubmitStep1} noValidate className="space-y-6">
+        {/* ---------------- Card type + Bank ---------------- */}
         <Card className="overflow-hidden">
-          <div className="flex items-center gap-4 border-b bg-muted/40 p-4">
+          <div className="flex flex-col gap-4 border-b bg-muted/30 p-5 sm:flex-row sm:items-center">
             <div
               className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl ${typeAccent}`}
             >
@@ -553,7 +529,7 @@ function CreditCardApplyInner() {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-semibold">
+              <p className="text-base font-semibold">
                 {cardTypeLabel(selectedCardType)}
               </p>
 
@@ -564,23 +540,21 @@ function CreditCardApplyInner() {
               </p>
             </div>
 
-            <Badge variant="outline" className="text-[10px]">
+            <Badge variant="outline" className="w-fit text-[10px]">
               {isFd ? "FD" : "NORMAL"}
             </Badge>
           </div>
 
-          <CardContent className="pt-4">
-            <div className="max-w-md space-y-2">
-              <Label htmlFor="card_type">
-                Card Type <span className="text-destructive">*</span>
+          <CardContent className="grid gap-5 p-5 sm:grid-cols-2 sm:p-6">
+            <div className="space-y-2">
+              <Label htmlFor="card_type" className="text-sm font-medium">
+                Card type <span className="text-destructive">*</span>
               </Label>
 
               <Select
                 value={selectedCardType}
                 onValueChange={(value) =>
-                  form.setValue("card_type", (value ?? "normal") as CardType, {
-                    shouldValidate: true,
-                  })
+                  handleCardTypeChange((value ?? "normal") as CardType)
                 }
               >
                 <SelectTrigger id="card_type" className="h-10">
@@ -597,237 +571,223 @@ function CreditCardApplyInner() {
 
                 <SelectContent>
                   <SelectItem value="fd">FD Credit Card</SelectItem>
-                  <SelectItem value="normal">Normal Credit Card</SelectItem>
+                  <SelectItem value="normal">Credit Card</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-          </CardContent>
-        </Card>
 
-        {/* ====================================================== */}
-        {/* Partner Bank (REQUIRED)                                 */}
-        {/* ====================================================== */}
+            {/* Bank picker — visible for normal cards only */}
+            {selectedCardType === "normal" && (
+              <div className="space-y-2">
+                <Label htmlFor="bank_id" className="text-sm font-medium">
+                  Bank <span className="text-destructive">*</span>
+                </Label>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              Partner Bank <span className="text-destructive">*</span>
-            </CardTitle>
-          </CardHeader>
-
-          <Separator />
-
-          <CardContent className="space-y-3 pt-4">
-            <Select
-              value={selectedBankId ? String(selectedBankId) : ""}
-              onValueChange={(value) =>
-                form.setValue("bank_id", Number(value), {
-                  shouldValidate: true,
-                })
-              }
-              disabled={loadingBanks}
-            >
-              <SelectTrigger className="max-w-xl h-10">
-                <Landmark className="mr-2 h-4 w-4 text-muted-foreground" />
-                <span
-                  className={!selectedBankId ? "text-muted-foreground" : ""}
+                <Select
+                  value={
+                    selectedBankId != null && selectedBankId !== 0
+                      ? String(selectedBankId)
+                      : ""
+                  }
+                  onValueChange={(value) => {
+                    form.setValue(
+                      "bank_id",
+                      value ? Number(value) : undefined,
+                      { shouldValidate: true },
+                    );
+                  }}
+                  disabled={banksLoading}
                 >
-                  {optionTag(bankOptions, selectedBankId) ?? "Select bank"}
-                </span>
-              </SelectTrigger>
+                  <SelectTrigger id="bank_id" className="h-10">
+                    <span
+                      className={
+                        selectedBankId == null ? "text-muted-foreground" : ""
+                      }
+                    >
+                      {banksLoading
+                        ? "Loading banks..."
+                        : (optionTag(bankOptions, selectedBankId) ??
+                          "Select a bank")}
+                    </span>
+                  </SelectTrigger>
 
-              <SelectContent>
-                {bankOptions.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.tag}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  <SelectContent>
+                    {bankOptions.length === 0 ? (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">
+                        No banks available. Ask admin to add one.
+                      </div>
+                    ) : (
+                      bankOptions.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.tag}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
 
-            {errors.bank_id && (
-              <p className="text-xs text-destructive">
-                {errors.bank_id.message}
-              </p>
+                {errors.bank_id && (
+                  <p className="text-xs text-destructive">
+                    {errors.bank_id.message}
+                  </p>
+                )}
+              </div>
             )}
-
-            <p className="text-xs text-muted-foreground">
-              The customer will receive this bank&apos;s application link via
-              WhatsApp after submission.
-            </p>
           </CardContent>
         </Card>
 
-        {/* ====================================================== */}
-        {/* Customer Details                                       */}
-        {/* ====================================================== */}
+        {/* ---------------- Customer details ---------------- */}
+        <SectionCard
+          icon={User}
+          title="Customer details"
+          description="Basic contact information of the applicant"
+        >
+          <Field
+            id="full_name"
+            label="Full name"
+            icon={User}
+            error={errors.full_name?.message}
+            className="sm:col-span-2"
+          >
+            {(props) => (
+              <Input
+                {...props}
+                autoComplete="name"
+                placeholder="e.g., Surajit Singh"
+                {...form.register("full_name")}
+              />
+            )}
+          </Field>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Customer Details</CardTitle>
-          </CardHeader>
+          <Field
+            id="email"
+            label="Email"
+            icon={Mail}
+            error={errors.email?.message}
+            className="sm:col-span-2"
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="email"
+                autoComplete="email"
+                placeholder="you@example.com"
+                {...form.register("email")}
+              />
+            )}
+          </Field>
 
-          <Separator />
+          <Field
+            id="phone"
+            label="Phone"
+            icon={Phone}
+            error={errors.phone?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="9876543210"
+                {...form.register("phone")}
+              />
+            )}
+          </Field>
 
-          <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
-            <Field
-              id="full_name"
-              label="Full Name"
-              icon={User}
-              error={errors.full_name?.message}
-              className="sm:col-span-2"
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  autoComplete="name"
-                  placeholder="e.g., Surajit Singh"
-                  {...form.register("full_name")}
-                />
-              )}
-            </Field>
+          <Field
+            id="pincode"
+            label="Pincode"
+            icon={MapPin}
+            error={errors.pincode?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                inputMode="numeric"
+                autoComplete="postal-code"
+                placeholder="713103"
+                {...form.register("pincode")}
+              />
+            )}
+          </Field>
+        </SectionCard>
 
-            <Field
-              id="email"
-              label="Email"
-              icon={Mail}
-              error={errors.email?.message}
-              className="sm:col-span-2"
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                  {...form.register("email")}
-                />
-              )}
-            </Field>
+        {/* ---------------- Government IDs ---------------- */}
+        <SectionCard
+          icon={ShieldCheck}
+          title="Government IDs"
+          description="Identity information required for verification"
+        >
+          <Field
+            id="aadhaar_number"
+            label="Aadhaar number"
+            icon={IdCard}
+            error={errors.aadhaar_number?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                inputMode="numeric"
+                placeholder="1234 5678 9012"
+                maxLength={14}
+                {...form.register("aadhaar_number")}
+              />
+            )}
+          </Field>
 
-            <Field
-              id="phone"
-              label="Phone"
-              icon={Phone}
-              error={errors.phone?.message}
-              hint="WhatsApp link will be sent to this number."
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="9876543210"
-                  {...form.register("phone")}
-                />
-              )}
-            </Field>
+          <Field
+            id="pan_number"
+            label="PAN number"
+            icon={PanIcon}
+            error={errors.pan_number?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                className={`${props.className} uppercase`}
+                placeholder="ABCDE1234F"
+                maxLength={10}
+                {...form.register("pan_number", {
+                  onChange: (event) => {
+                    event.target.value = event.target.value.toUpperCase();
+                  },
+                })}
+              />
+            )}
+          </Field>
+        </SectionCard>
 
-            <Field
-              id="pincode"
-              label="Pincode"
-              icon={MapPin}
-              error={errors.pincode?.message}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  inputMode="numeric"
-                  autoComplete="postal-code"
-                  placeholder="713103"
-                  {...form.register("pincode")}
-                />
-              )}
-            </Field>
-          </CardContent>
-        </Card>
-
-        {/* ====================================================== */}
-        {/* Government IDs                                         */}
-        {/* ====================================================== */}
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Government IDs</CardTitle>
-          </CardHeader>
-
-          <Separator />
-
-          <CardContent className="grid gap-4 pt-4 sm:grid-cols-2">
-            <Field
-              id="aadhaar_number"
-              label="Aadhaar Number"
-              icon={IdCard}
-              error={errors.aadhaar_number?.message}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  inputMode="numeric"
-                  placeholder="1234 5678 9012"
-                  maxLength={14}
-                  {...form.register("aadhaar_number")}
-                />
-              )}
-            </Field>
-
-            <Field
-              id="pan_number"
-              label="PAN Number"
-              icon={PanIcon}
-              error={errors.pan_number?.message}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  className={`${props.className} uppercase`}
-                  placeholder="ABCDE1234F"
-                  maxLength={10}
-                  {...form.register("pan_number", {
-                    onChange: (event) => {
-                      event.target.value = event.target.value.toUpperCase();
-                    },
-                  })}
-                />
-              )}
-            </Field>
-          </CardContent>
-        </Card>
-
-        {/* ====================================================== */}
-        {/* Assignment (admin only)                                */}
-        {/* ====================================================== */}
-
+        {/* ---------------- Assignment ---------------- */}
         {isAdmin && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Assignment</CardTitle>
-            </CardHeader>
-
-            <Separator />
-
-            <CardContent className="space-y-3 pt-4">
-              <Label htmlFor="agent_id">
-                Assign to Agent{" "}
+          <SectionCard
+            icon={UserCog}
+            title="Application assignment"
+            description="Choose which agent will handle this application"
+          >
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="agent_id" className="text-sm font-medium">
+                Assign to agent{" "}
                 <span className="font-normal text-muted-foreground">
                   (optional)
                 </span>
               </Label>
 
               <Select
-                value={selectedAgentId ? String(selectedAgentId) : ""}
+                value={
+                  form.watch("agent_id") ? String(form.watch("agent_id")) : ""
+                }
                 onValueChange={(value) =>
                   form.setValue("agent_id", value ? Number(value) : undefined)
                 }
               >
-                <SelectTrigger id="agent_id" className="max-w-xl h-10">
-                  <UserCog className="mr-2 h-4 w-4 text-muted-foreground" />
-
+                <SelectTrigger id="agent_id" className="h-10 max-w-xl">
                   <span
-                    className={!selectedAgentId ? "text-muted-foreground" : ""}
+                    className={
+                      !form.watch("agent_id") ? "text-muted-foreground" : ""
+                    }
                   >
-                    {optionTag(agentOptions, selectedAgentId) ??
+                    {optionTag(agentOptions, form.watch("agent_id")) ??
                       "Leave blank for office"}
                   </span>
                 </SelectTrigger>
@@ -845,87 +805,11 @@ function CreditCardApplyInner() {
                 Leave blank to mark this application as{" "}
                 <strong>applied from office</strong>.
               </p>
-            </CardContent>
-          </Card>
+            </div>
+          </SectionCard>
         )}
 
-        {/* Selected bank details — target audience + documents */}
-        {selectedBank && (
-          <Card className="border-blue-500/30">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-3">
-                {selectedBank.logo_path ? (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white">
-                    <img
-                      src={documentUrl(selectedBank.logo_path) ?? ""}
-                      alt={selectedBank.bank_name}
-                      className="h-full w-full object-contain p-1"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600">
-                    <Landmark className="h-5 w-5" />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <CardTitle className="truncate text-sm">
-                    {selectedBank.bank_name}
-                  </CardTitle>
-                  {selectedBank.tagline && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {selectedBank.tagline}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent className="space-y-4 pt-4">
-              {/* Target Audience */}
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <Users className="h-3.5 w-3.5" />
-                  Target Audience
-                </p>
-                <ul className="space-y-1 text-xs text-foreground">
-                  {selectedBank.target_audience
-                    .split("\n")
-                    .filter((l) => l.trim())
-                    .map((line, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-emerald-600">✔</span>
-                        <span className="flex-1">{line.trim()}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-
-              {/* Documents Required */}
-              <div>
-                <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <FileText className="h-3.5 w-3.5" />
-                  Documents Required
-                </p>
-                <ul className="space-y-1 text-xs text-foreground">
-                  {selectedBank.documents_required
-                    .split("\n")
-                    .filter((l) => l.trim())
-                    .map((line, i) => (
-                      <li key={i} className="flex gap-2">
-                        <span className="text-blue-600">✔</span>
-                        <span className="flex-1">{line.trim()}</span>
-                      </li>
-                    ))}
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* ====================================================== */}
-        {/* FD Information                                          */}
-        {/* ====================================================== */}
-
+        {/* ---------------- FD info ---------------- */}
         {isFd && (
           <Card className="border-violet-500/30 bg-violet-500/5">
             <CardContent className="flex gap-3 p-4">
@@ -936,7 +820,7 @@ function CreditCardApplyInner() {
                   Documents required
                 </p>
 
-                <p className="text-xs text-violet-700/80 dark:text-violet-400/80">
+                <p className="text-sm text-violet-700/80 dark:text-violet-400/80">
                   FD credit cards require Aadhaar and PAN documents. You&apos;ll
                   upload them after saving the application details.
                 </p>
@@ -945,10 +829,7 @@ function CreditCardApplyInner() {
           </Card>
         )}
 
-        {/* ====================================================== */}
-        {/* Actions                                                  */}
-        {/* ====================================================== */}
-
+        {/* ---------------- Bottom actions ---------------- */}
         <Card>
           <CardContent className="space-y-4 p-5 sm:p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -1007,29 +888,20 @@ function CreditCardApplyInner() {
 }
 
 /* ------------------------------------------------------------------ */
-/* Suspense wrapper                                                   */
+/* Suspense wrapper                                                    */
 /* ------------------------------------------------------------------ */
 
 export default function CreditCardApply() {
   return (
     <Suspense
       fallback={
-        <div className="space-y-4">
+        <div className="w-full space-y-6">
           <Skeleton className="h-8 w-64" />
           <Skeleton className="h-10 w-full" />
-
-          <div className="grid gap-4 lg:grid-cols-3">
-            <div className="space-y-4 lg:col-span-2">
-              <Skeleton className="h-40 w-full" />
-              <Skeleton className="h-72 w-full" />
-              <Skeleton className="h-56 w-full" />
-            </div>
-
-            <div className="space-y-4">
-              <Skeleton className="h-44 w-full" />
-              <Skeleton className="h-28 w-full" />
-              <Skeleton className="h-24 w-full" />
-            </div>
+          <div className="space-y-6">
+            <Skeleton className="h-48 w-full" />
+            <Skeleton className="h-72 w-full" />
+            <Skeleton className="h-56 w-full" />
           </div>
         </div>
       }

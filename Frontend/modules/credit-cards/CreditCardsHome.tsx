@@ -66,30 +66,47 @@ export default function CreditCardsHome() {
   const [statusTarget, setStatusTarget] =
     useState<CreditCardApplication | null>(null);
 
-  const appsQ = useCreditCardApplications({
+  // Backend only gets the enum filters — search is done client-side.
+  const filters = {
     status: status === "all" ? undefined : status,
     card_type: cardType === "all" ? undefined : cardType,
-  });
+  };
+
+  const appsQ = useCreditCardApplications(filters);
   const rawApps = appsQ.data ?? [];
 
   const apps = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rawApps;
 
-    return rawApps.filter((app) => {
-      const leadId =
-        `CC${String(app.application_id).padStart(5, "0")}`.toLowerCase();
-      const leadIdFull = `#${leadId}`;
+    const qDigits = q.replace(/\D/g, "");
 
-      return (
-        app.full_name.toLowerCase().includes(q) ||
-        app.email?.toLowerCase().includes(q) ||
-        app.phone?.includes(q) ||
-        app.bank_name?.toLowerCase().includes(q) ||
+    return rawApps.filter((app) => {
+      const idNum = String(app.application_id);
+      const leadId = `cc${idNum.padStart(5, "0")}`; // "cc00005"
+      const leadIdFull = `#${leadId}`; // "#cc00005"
+
+      // ---- Lead ID ----
+      if (
+        idNum.includes(qDigits) ||
+        idNum.padStart(5, "0").includes(qDigits) ||
         leadId.includes(q) ||
-        leadIdFull.includes(q) ||
-        String(app.application_id).includes(q)
-      );
+        leadIdFull.includes(q)
+      ) {
+        // Only take the digits-only branch if the query is a lead-id shape
+        if (qDigits.length > 0 && !/[a-z]/.test(q.replace(/cc|#/g, ""))) {
+          return true;
+        }
+      }
+
+      // ---- Text fields ----
+      if (app.full_name?.toLowerCase().includes(q)) return true;
+      if (app.email?.toLowerCase().includes(q)) return true;
+      if (app.phone?.includes(q)) return true;
+      if ((app.bank_name ?? "").toLowerCase().includes(q)) return true;
+      if ((app.agent_name ?? "").toLowerCase().includes(q)) return true;
+
+      return false;
     });
   }, [rawApps, search]);
 
@@ -111,7 +128,7 @@ export default function CreditCardsHome() {
         <div className="relative w-full lg:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name, email, phone, or lead ID..."
+            placeholder="Search by lead ID, name, email, phone..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -152,7 +169,7 @@ export default function CreditCardsHome() {
       {/* Table */}
       <div className="rounded-lg border bg-card">
         {appsQ.isLoading ? (
-          <TableSkeleton rows={8} cols={8} />
+          <TableSkeleton rows={8} cols={7} />
         ) : apps.length === 0 ? (
           <EmptyState
             title="No credit card applications yet"
@@ -175,13 +192,12 @@ export default function CreditCardsHome() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
+                  <TableHead>Lead ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Contact
                   </TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead className="hidden md:table-cell">Bank</TableHead>
                   <TableHead className="hidden lg:table-cell">
                     Applied By
                   </TableHead>
@@ -220,9 +236,6 @@ export default function CreditCardsHome() {
                       >
                         {cardTypeLabel(app.card_type)}
                       </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground">
-                      {app.bank_name || "—"}
                     </TableCell>
                     <TableCell className="hidden lg:table-cell">
                       {app.applied_from_office ? (

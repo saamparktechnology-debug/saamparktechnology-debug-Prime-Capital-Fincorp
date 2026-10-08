@@ -5,10 +5,12 @@ export type InterestType = "flat" | "reducing";
 
 export interface Loan {
   loan_id: number;
-  customer_id: number;
+  customer_id: number | null; // ← was number
+  customer_full_name: string | null; // ← new
+  customer_phone: string | null;
   aadhaar_number?: string | null;
   pan_number?: string | null;
-  agent_id: number;
+  agent_id: number | null;
   loan_type: LoanType | string;
   bank_id?: number | null;
   bank_name?: string | null;

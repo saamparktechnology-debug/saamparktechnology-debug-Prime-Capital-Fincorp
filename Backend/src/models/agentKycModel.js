@@ -12,13 +12,12 @@ const AgentKycModel = {
     );
     return rows[0] || null;
   },
-
   /**
    * Create a KYC row (auto-init when agent is created)
    */
   async create(agentId, defaults = {}) {
-    // Format: PCF205 + agent_id padded to 3 digits (e.g., PCF205001, PCF205002)
-    const code = `PCF205${String(agentId).padStart(3, "0")}`;
+    // Format: PCF205 + "00" + agent_id  (e.g., agent 1 → PCF205001)
+    const code = `PCF20500${agentId}`;
     const [result] = await pool.query(
       `INSERT INTO agent_kyc 
       (agent_id, agent_code, full_name, email, primary_phone, kyc_status)

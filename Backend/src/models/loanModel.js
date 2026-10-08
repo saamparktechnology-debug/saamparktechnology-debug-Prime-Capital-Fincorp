@@ -12,31 +12,34 @@ const LoanModel = {
 
   async create(loanData, agentId) {
     const query = `
-    INSERT INTO loans (
-      customer_id, loan_type, agent_id, bank_id,
-      requested_amount, tenure_months, interest_rate, interest_type, purpose,
-      aadhaar_number, pan_number,
-      business_name, business_type_id, business_category_id,
-      business_age_years, annual_turnover, ownership_type,
-      business_address, business_landmark, business_city, business_state, business_pincode,
-      client_dob, client_marital_status, client_spouse_name, client_mother_name,
-      client_alternate_phone, client_address, client_landmark, client_city, client_state, client_pincode,
-      loan_status
-    )
-    VALUES (
-      ?, ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?,
-      ?, ?, ?,
-      ?, ?, ?,
-      ?, ?, ?, ?, ?,
-      ?, ?, ?, ?,
-      ?, ?, ?, ?, ?, ?,
-      ?
-    )
-  `;
+      INSERT INTO loans (
+        customer_id, customer_full_name, customer_phone,
+        loan_type, agent_id, bank_id,
+        requested_amount, tenure_months, interest_rate, interest_type, purpose,
+        aadhaar_number, pan_number,
+        business_name, business_type_id, business_category_id,
+        business_age_years, annual_turnover, ownership_type,
+        business_address, business_landmark, business_city, business_state, business_pincode,
+        client_dob, client_marital_status, client_spouse_name, client_mother_name,
+        client_alternate_phone, client_address, client_landmark, client_city, client_state, client_pincode,
+        loan_status
+      )
+      VALUES (
+        NULL, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?,
+        ?, ?, ?,
+        ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?
+      )
+    `;
     const values = [
-      loanData.customer_id,
+      loanData.customer_full_name,
+      loanData.customer_phone,
       loanData.loan_type,
       agentId,
       loanData.bank_id || null,
@@ -215,13 +218,9 @@ const LoanModel = {
         b.bank_name, 
         b.short_code AS bank_short_code,
         b.apply_link AS bank_apply_link,
-        c.first_name, 
-        c.last_name,
-        c.primary_phone,
         a.full_name AS agent_name
       FROM loans l
       LEFT JOIN banks b ON l.bank_id = b.bank_id
-      LEFT JOIN customers c ON l.customer_id = c.customer_id
       LEFT JOIN agents a ON l.agent_id = a.agent_id
     `;
     const params = [];

@@ -93,17 +93,11 @@ const createApplication = async (req, res) => {
     }
 
     // Determine agent id
-    let assignedAgentId;
+    let assignedAgentId = null;
     if (req.user.role === "agent") {
       assignedAgentId = req.user.id;
     } else if (req.user.role === "admin") {
-      if (!agent_id) {
-        return res.status(400).json({
-          status: "fail",
-          message: "Admin must specify agent_id.",
-        });
-      }
-      assignedAgentId = Number(agent_id);
+      assignedAgentId = agent_id ? Number(agent_id) : null;
     }
 
     // Verify bank exists & is active

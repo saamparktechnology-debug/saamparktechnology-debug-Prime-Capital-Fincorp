@@ -2,20 +2,19 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import {
   Loader2,
-  AlertTriangle,
   Search,
   Building2,
   CheckCircle2,
   ExternalLink,
-  ArrowLeft,
+  User,
+  Phone,
 } from "lucide-react";
-import Link from "next/link";
 
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,19 +28,12 @@ import {
   SelectTrigger,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
 import { useCreateLoan, useUpdateLoanStatus } from "../hooks/useLoans";
-import { useCustomersList } from "@/modules/customers/hooks/useCustomers";
 import { useAuthStore } from "@/store/authStore";
-import {
-  ROLE,
-  LOAN_TYPES,
-  KYC_STATUS,
-  LOAN_STATUS,
-} from "@/lib/constants/statuses";
+import { ROLE, LOAN_TYPES } from "@/lib/constants/statuses";
 import { type SelectOption, optionTag } from "@/lib/format";
 import {
   AADHAAR_REGEX,
@@ -58,6 +50,7 @@ import {
 
 import { LoanDocumentStep } from "./LoanDocumentStep";
 import type { Loan } from "../types";
+import { WhatsAppShare } from "@/components/shared/WhatsAppShare";
 
 // ---- Static options ----
 const LOAN_TYPE_OPTIONS: SelectOption[] = LOAN_TYPES.map((t) => ({
@@ -84,12 +77,14 @@ const MARITAL_OPTIONS: SelectOption[] = [
   { value: "divorced", tag: "Divorced" },
 ];
 
-// ---- Detect business loan type (accepts both variants) ----
 const isBusinessType = (t: string) => t === "Business" || t === "Business Loan";
+
+const phoneRegex = /^\+?[0-9]{10,15}$/;
 
 // ---- Schema ----
 const baseSchema = z.object({
-  customer_id: z.number({ message: "Select a customer" }),
+  full_name: z.string().min(2, "Customer name is required"),
+  phone: z.string().regex(phoneRegex, "Enter a valid phone"),
   loan_type: z.string().min(1, "Select loan type"),
   bank_id: z.number().optional(),
   requested_amount: z
@@ -156,11 +151,7 @@ const schema = baseSchema.superRefine((data, ctx) => {
   for (const [key, message] of requiredBusiness) {
     const v = (data as any)[key];
     if (v === undefined || v === null || v === "" || Number.isNaN(v)) {
-      ctx.addIssue({
-        code: "custom",
-        path: [key],
-        message,
-      });
+      ctx.addIssue({ code: "custom", path: [key], message });
     }
   }
 
@@ -177,11 +168,7 @@ const schema = baseSchema.superRefine((data, ctx) => {
   for (const [key, message] of requiredClient) {
     const v = (data as any)[key];
     if (v === undefined || v === null || v === "") {
-      ctx.addIssue({
-        code: "custom",
-        path: [key],
-        message,
-      });
+      ctx.addIssue({ code: "custom", path: [key], message });
     }
   }
 });
@@ -236,11 +223,6 @@ export function LoanForm() {
   const role = useAuthStore((s) => s.user?.role);
   const isAdmin = role === ROLE.ADMIN;
 
-  const { data: customers, isLoading: loadingCustomers } = useCustomersList();
-  const [customerSearch, setCustomerSearch] = useState("");
-  const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
-    null,
-  );
   const { data: banks, isLoading: loadingBanks } = useBanksList();
   const { data: businessTypes } = useBusinessTypes(true);
   const { data: businessCategories } = useBusinessCategories(true);
@@ -255,6 +237,8 @@ export function LoanForm() {
   const form = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: {
+      full_name: "",
+      phone: "",
       loan_type: preselectedType,
       requested_amount: 0,
       tenure_months: 12,
@@ -290,25 +274,6 @@ export function LoanForm() {
   const createM = useCreateLoan();
   const updateStatusM = useUpdateLoanStatus(createdLoan?.loan_id);
 
-  const selectedCustomer = useMemo(
-    () => customers?.find((c) => c.customer_id === selectedCustomerId) ?? null,
-    [customers, selectedCustomerId],
-  );
-
-  const eligibleCustomers = useMemo(() => {
-    if (!customers) return [];
-    const q = customerSearch.trim().toLowerCase();
-    return customers.filter((c) => {
-      if (c.kyc_status !== KYC_STATUS.APPROVED) return false;
-      if (!q) return true;
-      return (
-        c.first_name.toLowerCase().includes(q) ||
-        c.last_name.toLowerCase().includes(q) ||
-        c.primary_phone.includes(q)
-      );
-    });
-  }, [customers, customerSearch]);
-
   const bankOptions = useMemo<SelectOption[]>(
     () =>
       (banks ?? [])
@@ -343,6 +308,14 @@ export function LoanForm() {
   const selectedBankId = form.watch("bank_id");
   const isBusiness = isBusinessType(loanType);
 
+  // Clear bank selection when switching to a Business loan
+  useEffect(() => {
+    if (isBusiness) {
+      form.setValue("bank_id", undefined);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBusiness]);
+
   const loanTypeTag = optionTag(LOAN_TYPE_OPTIONS, loanType) ?? "Select type";
   const interestTypeTag =
     optionTag(INTEREST_TYPE_OPTIONS, interestType) ?? "Select type";
@@ -353,7 +326,6 @@ export function LoanForm() {
   const onSubmitStep1 = form.handleSubmit((values) => {
     createM.mutate(values as any, {
       onSuccess: (res) => {
-        // Determine bank redirect data
         const chosenBank = (banks ?? []).find(
           (b) => b.bank_id === values.bank_id,
         );
@@ -368,7 +340,6 @@ export function LoanForm() {
           loan_id: res.loan_id,
           loan_status: "Applied",
           loan_type: values.loan_type,
-          // ...other fields will come from backend on refetch; minimal here
         } as Loan;
 
         setCreatedLoan(loan);
@@ -385,14 +356,17 @@ export function LoanForm() {
   // -------------- Step 2 Submit Lead --------------
   const onSubmitStep2 = () => {
     if (!createdLoan) return;
-    // Keep status as "Applied" (per decision)
-    // If you later want to bump to "Under Review", uncomment:
-    // updateStatusM.mutate({ loan_status: "Applied" }, { onSuccess: () => setCurrentStep(3) });
     setCurrentStep(3);
   };
 
   // -------------- Step 3 — Success --------------
   if (currentStep === 3 && createdLoan) {
+    const productLabel = isBusiness ? "Business Loan" : createdLoan.loan_type;
+    const companyName = "Capital Fincorp Pvt. Ltd.";
+    const successMessage = selectedBankForRedirect
+      ? `Hi,\n\nPlease complete your ${productLabel} application with ${selectedBankForRedirect.bank_name} using this link:\n\n${selectedBankForRedirect.apply_link}\n\n- ${companyName}`
+      : `Hi,\n\nYour ${productLabel} application has been recorded. Our team will get in touch shortly.\n\n- ${companyName}`;
+
     return (
       <div className="mx-auto max-w-lg space-y-6">
         <StepIndicator current={3} />
@@ -409,6 +383,7 @@ export function LoanForm() {
                 : "Your loan application has been recorded."}
             </p>
           </div>
+
           <CardContent className="space-y-4 p-6">
             <div className="rounded-lg border bg-muted/40 p-4">
               <p className="text-xs text-muted-foreground">Reference ID</p>
@@ -416,6 +391,12 @@ export function LoanForm() {
                 #LN{String(createdLoan.loan_id).padStart(5, "0")}
               </p>
             </div>
+
+            <WhatsAppShare
+              defaultPhone={form.getValues("phone")}
+              message={successMessage}
+              helperText="Send the application link directly to the customer."
+            />
 
             <div className="flex flex-col gap-2 pt-2">
               {selectedBankForRedirect && (
@@ -469,105 +450,47 @@ export function LoanForm() {
         {/* Customer */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Customer</CardTitle>
+            <CardTitle className="text-base">Customer Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {loadingCustomers ? (
-              <p className="text-sm text-muted-foreground">
-                Loading customers...
-              </p>
-            ) : (
-              <>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by name or phone (only KYC-approved shown)"
-                    className="pl-9"
-                    value={customerSearch}
-                    onChange={(e) => setCustomerSearch(e.target.value)}
-                  />
-                </div>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2 md:col-span-2">
+              <Label>
+                Full Name <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  placeholder="e.g., Surajit Singh"
+                  {...form.register("full_name")}
+                />
+              </div>
+              {form.formState.errors.full_name && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.full_name.message}
+                </p>
+              )}
+            </div>
 
-                {!customerSearch && !selectedCustomerId && (
-                  <p className="text-xs text-muted-foreground">
-                    Start typing to find a KYC-approved customer.
-                  </p>
-                )}
-
-                {customerSearch && eligibleCustomers.length === 0 && (
-                  <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertDescription>
-                      No KYC-approved customer matches "{customerSearch}".
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {customerSearch && eligibleCustomers.length > 0 && (
-                  <ul className="max-h-60 divide-y overflow-y-auto rounded-lg border">
-                    {eligibleCustomers.slice(0, 20).map((c) => (
-                      <li key={c.customer_id}>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedCustomerId(c.customer_id);
-                            form.setValue("customer_id", c.customer_id, {
-                              shouldValidate: true,
-                            });
-                            setCustomerSearch("");
-                          }}
-                          className="flex w-full items-center justify-between gap-3 p-3 text-left transition-colors hover:bg-muted/50"
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium">
-                              {c.first_name} {c.last_name}
-                            </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {c.primary_phone}
-                            </p>
-                          </div>
-                          <span className="text-xs text-emerald-600">
-                            KYC approved
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                {selectedCustomer && (
-                  <div className="flex items-center justify-between rounded-lg border bg-muted/30 p-3">
-                    <div>
-                      <p className="text-sm font-medium">
-                        {selectedCustomer.first_name}{" "}
-                        {selectedCustomer.last_name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {selectedCustomer.primary_phone} •{" "}
-                        {selectedCustomer.national_id_number}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedCustomerId(null);
-                        form.setValue("customer_id", undefined as any);
-                      }}
-                    >
-                      Change
-                    </Button>
-                  </div>
-                )}
-
-                {form.formState.errors.customer_id && !selectedCustomer && (
-                  <p className="text-xs text-destructive">
-                    Please select a customer.
-                  </p>
-                )}
-              </>
-            )}
+            <div className="space-y-2 md:col-span-2">
+              <Label>
+                Mobile Number <span className="text-destructive">*</span>
+              </Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-9"
+                  inputMode="tel"
+                  placeholder="9876543210"
+                  {...form.register("phone")}
+                />
+              </div>
+              {form.formState.errors.phone && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.phone.message}
+                </p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -581,14 +504,7 @@ export function LoanForm() {
               <Label>Loan Type</Label>
               <Select
                 value={loanType}
-                onValueChange={(v) => {
-                  const newType = v ?? "";
-                  form.setValue("loan_type", newType);
-                  // Business loans don't need bank
-                  if (newType === "Business" || newType === "Business Loan") {
-                    form.setValue("bank_id", undefined);
-                  }
-                }}
+                onValueChange={(v) => form.setValue("loan_type", v ?? "")}
               >
                 <SelectTrigger>
                   <span>{loanTypeTag}</span>
@@ -715,9 +631,6 @@ export function LoanForm() {
                     ))}
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
-                  Select the partner bank where this loan will be submitted.
-                </p>
               </div>
             )}
           </CardContent>
@@ -1215,10 +1128,7 @@ export function LoanForm() {
           >
             Cancel
           </Button>
-          <Button
-            type="submit"
-            disabled={createM.isPending || !selectedCustomer}
-          >
+          <Button type="submit" disabled={createM.isPending}>
             {createM.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />

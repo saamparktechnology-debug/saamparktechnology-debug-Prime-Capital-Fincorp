@@ -1,10 +1,10 @@
-// modules/loans/components/LoanTable.tsx
 "use client";
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Search, Filter } from "lucide-react";
-
+import { Building2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -50,26 +50,41 @@ export function LoanTable({
 
   const filtered = useMemo(() => {
     if (!data) return [];
+
     const q = search.trim().toLowerCase();
+    const qDigits = q.replace(/\D/g, "");
+
     return data.filter((l) => {
-      if (statusFilter !== "all" && l.loan_status !== statusFilter)
+      if (statusFilter !== "all" && l.loan_status !== statusFilter) {
         return false;
+      }
       if (!q) return true;
 
-      const name = `${l.first_name ?? ""} ${l.last_name ?? ""}`.toLowerCase();
-      const leadId = `LN${String(l.loan_id).padStart(5, "0")}`.toLowerCase();
+      const idNum = String(l.loan_id);
+      const leadId = `ln${idNum.padStart(5, "0")}`;
       const leadIdFull = `#${leadId}`;
 
-      return (
-        String(l.loan_id).includes(q) ||
+      // ---- Lead ID ----
+      if (
+        idNum.includes(qDigits) ||
+        idNum.padStart(5, "0").includes(qDigits) ||
         leadId.includes(q) ||
-        leadIdFull.includes(q) ||
-        name.includes(q) ||
-        (l.primary_phone ?? "").includes(q) ||
-        (l.loan_type ?? "").toLowerCase().includes(q) ||
-        (l.purpose ?? "").toLowerCase().includes(q) ||
-        (l.agent_name ?? "").toLowerCase().includes(q)
-      );
+        leadIdFull.includes(q)
+      ) {
+        if (qDigits.length > 0 && !/[a-z]/.test(q.replace(/ln|#/g, ""))) {
+          return true;
+        }
+      }
+
+      // ---- Text fields ----
+      const name = (l.customer_full_name ?? "").toLowerCase();
+      if (name.includes(q)) return true;
+      if ((l.customer_phone ?? "").includes(q)) return true;
+      if ((l.loan_type ?? "").toLowerCase().includes(q)) return true;
+      if ((l.purpose ?? "").toLowerCase().includes(q)) return true;
+      if ((l.agent_name ?? "").toLowerCase().includes(q)) return true;
+
+      return false;
     });
   }, [data, search, statusFilter]);
 
@@ -80,7 +95,7 @@ export function LoanTable({
         <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by customer, lead ID, phone, agent..."
+            placeholder="Search by lead ID, customer, phone, agent..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -127,7 +142,7 @@ export function LoanTable({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
+                  <TableHead>Lead ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="hidden md:table-cell">Type</TableHead>
                   <TableHead className="text-right">Requested</TableHead>
@@ -153,19 +168,17 @@ export function LoanTable({
               <TableBody>
                 {filtered.map((l) => (
                   <TableRow key={l.loan_id} className="hover:bg-muted/40">
-                    <TableCell className="font-medium">
-                      #{String(l.loan_id).padStart(5, "0")}
+                    <TableCell className="font-mono text-xs font-medium">
+                      #LN{String(l.loan_id).padStart(5, "0")}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
                         <span className="text-sm font-medium">
-                          {l.first_name && l.last_name
-                            ? `${l.first_name} ${l.last_name}`
-                            : `Customer #${l.customer_id}`}
+                          {l.customer_full_name || `Loan #${l.loan_id}`}
                         </span>
-                        {l.primary_phone && (
+                        {l.customer_phone && (
                           <span className="text-xs text-muted-foreground">
-                            {l.primary_phone}
+                            {l.customer_phone}
                           </span>
                         )}
                       </div>
@@ -188,8 +201,20 @@ export function LoanTable({
                       {l.bank_name || "—"}
                     </TableCell>
                     {isAdmin && (
-                      <TableCell className="hidden xl:table-cell text-muted-foreground">
-                        {l.agent_name || "—"}
+                      <TableCell className="hidden xl:table-cell">
+                        {l.agent_id == null ? (
+                          <Badge
+                            variant="outline"
+                            className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                          >
+                            <Building2 className="mr-1 h-3 w-3" />
+                            From Office
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {l.agent_name || "—"}
+                          </span>
+                        )}
                       </TableCell>
                     )}
                     <TableCell>

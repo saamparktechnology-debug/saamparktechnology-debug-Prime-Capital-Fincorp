@@ -61,6 +61,7 @@ export default function SavingsHome() {
     null,
   );
 
+  // Backend only gets the enum filter — search is done client-side.
   const appsQ = useSavingsApplications({
     status: status === "all" ? undefined : status,
   });
@@ -70,19 +71,34 @@ export default function SavingsHome() {
     const q = search.trim().toLowerCase();
     if (!q) return rawApps;
 
-    return rawApps.filter((app) => {
-      const leadId =
-        `SV${String(app.application_id).padStart(5, "0")}`.toLowerCase();
-      const leadIdFull = `#${leadId}`;
+    const qDigits = q.replace(/\D/g, "");
 
-      return (
-        app.full_name.toLowerCase().includes(q) ||
-        app.email?.toLowerCase().includes(q) ||
-        app.phone?.includes(q) ||
+    return rawApps.filter((app) => {
+      const idNum = String(app.application_id);
+      const leadId = `sv${idNum.padStart(5, "0")}`; // "sv00005"
+      const leadIdFull = `#${leadId}`; // "#sv00005"
+
+      // ---- Lead ID ----
+      if (
+        idNum.includes(qDigits) ||
+        idNum.padStart(5, "0").includes(qDigits) ||
         leadId.includes(q) ||
-        leadIdFull.includes(q) ||
-        String(app.application_id).includes(q)
-      );
+        leadIdFull.includes(q)
+      ) {
+        // Only trust a digits-only hit if the query is genuinely a lead-id shape
+        if (qDigits.length > 0 && !/[a-z]/.test(q.replace(/sv|#/g, ""))) {
+          return true;
+        }
+      }
+
+      // ---- Text fields ----
+      if (app.full_name?.toLowerCase().includes(q)) return true;
+      if (app.email?.toLowerCase().includes(q)) return true;
+      if (app.phone?.includes(q)) return true;
+      if ((app.bank_name ?? "").toLowerCase().includes(q)) return true;
+      if ((app.agent_name ?? "").toLowerCase().includes(q)) return true;
+
+      return false;
     });
   }, [rawApps, search]);
 
@@ -104,7 +120,7 @@ export default function SavingsHome() {
         <div className="relative w-full sm:max-w-sm">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search by name, email, phone, or lead ID..."
+            placeholder="Search by lead ID, name, email, or phone..."
             className="pl-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -162,7 +178,7 @@ export default function SavingsHome() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
+                  <TableHead>Lead ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Contact

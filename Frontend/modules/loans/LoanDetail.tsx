@@ -1,4 +1,3 @@
-// modules/loans/LoanDetail.tsx
 "use client";
 
 import { useParams } from "next/navigation";
@@ -48,7 +47,7 @@ export default function LoanDetail() {
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  // ---- Early returns NOW (all hooks have already run) ----
+  // ---- Early returns ----
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -77,6 +76,8 @@ export default function LoanDetail() {
     ["Disbursed", "Active"].includes(loan.loan_status) &&
     (!emis || emis.length === 0);
 
+  const displayName = loan.customer_full_name || `Loan #${loan.loan_id}`;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -104,7 +105,7 @@ export default function LoanDetail() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: timeline + customer card */}
+        {/* Left: customer info + timeline */}
         <div className="lg:col-span-1 space-y-6">
           {/* Customer info */}
           <Card>
@@ -114,33 +115,17 @@ export default function LoanDetail() {
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-                  {getInitials(
-                    `${loan.first_name ?? ""} ${loan.last_name ?? ""}`,
-                  )}
+                  {getInitials(displayName)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">
-                    {loan.first_name && loan.last_name
-                      ? `${loan.first_name} ${loan.last_name}`
-                      : `Customer #${loan.customer_id}`}
-                  </p>
-                  {loan.primary_phone && (
+                  <p className="truncate text-sm font-medium">{displayName}</p>
+                  {loan.customer_phone && (
                     <p className="truncate text-xs text-muted-foreground">
-                      {loan.primary_phone}
+                      {loan.customer_phone}
                     </p>
                   )}
                 </div>
               </div>
-
-              <Link
-                href={`/customers/${loan.customer_id}`}
-                className={buttonVariants({
-                  variant: "outline",
-                  size: "sm",
-                })}
-              >
-                View Customer Profile
-              </Link>
             </CardContent>
           </Card>
 
@@ -199,7 +184,14 @@ export default function LoanDetail() {
                 value={loan.bank_reference_number || "—"}
               />
               {isAdmin && (
-                <Row label="Handled by Agent" value={loan.agent_name || "—"} />
+                <Row
+                  label="Handled by Agent"
+                  value={
+                    loan.agent_id == null
+                      ? "Applied from office"
+                      : loan.agent_name || "—"
+                  }
+                />
               )}
               <Row
                 label="Rejection Reason"

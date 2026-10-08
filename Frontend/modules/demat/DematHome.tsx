@@ -10,6 +10,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -70,19 +71,35 @@ export default function DematHome() {
     const q = search.trim().toLowerCase();
     if (!q) return rawApps;
 
-    return rawApps.filter((app) => {
-      const leadId =
-        `DM${String(app.application_id).padStart(5, "0")}`.toLowerCase();
-      const leadIdFull = `#${leadId}`;
+    // Digits-only version of the query (e.g. "DM0005" → "0005", "#dm05" → "05")
+    const qDigits = q.replace(/\D/g, "");
 
-      return (
-        app.full_name.toLowerCase().includes(q) ||
-        app.email?.toLowerCase().includes(q) ||
-        app.phone?.includes(q) ||
+    return rawApps.filter((app) => {
+      const idNum = String(app.application_id);
+      const leadId = `dm${idNum.padStart(5, "0")}`; // "dm00005"
+      const leadIdFull = `#${leadId}`; // "#dm00005"
+
+      // ---- Lead ID matches ----
+      // Match raw id ("5"), padded id ("00005"), formatted ("dm00005", "#dm00005")
+      if (
+        idNum.includes(qDigits) ||
+        idNum.padStart(5, "0").includes(qDigits) ||
         leadId.includes(q) ||
-        leadIdFull.includes(q) ||
-        String(app.application_id).includes(q)
-      );
+        leadIdFull.includes(q)
+      ) {
+        // Only trust a digits-only hit if the query didn't have letters
+        // beyond dm/ln/# (so phone "98705" doesn't match id 705).
+        if (qDigits.length > 0 && !/[a-z]/.test(q.replace(/dm|ln|#/g, ""))) {
+          return true;
+        }
+      }
+
+      // ---- Text fields ----
+      if (app.full_name?.toLowerCase().includes(q)) return true;
+      if (app.email?.toLowerCase().includes(q)) return true;
+      if (app.phone?.includes(q)) return true;
+
+      return false;
     });
   }, [rawApps, search]);
 
@@ -162,7 +179,7 @@ export default function DematHome() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>#</TableHead>
+                  <TableHead>Lead ID</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Contact
@@ -194,8 +211,20 @@ export default function DematHome() {
                       </div>
                     </TableCell>
                     <TableCell>{app.bank_name || "—"}</TableCell>
-                    <TableCell className="hidden lg:table-cell text-muted-foreground">
-                      {app.agent_name || "—"}
+                    <TableCell className="hidden lg:table-cell">
+                      {app.agent_id == null ? (
+                        <Badge
+                          variant="outline"
+                          className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        >
+                          <Building2 className="mr-1 h-3 w-3" />
+                          From Office
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">
+                          {app.agent_name || "—"}
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={app.status} />

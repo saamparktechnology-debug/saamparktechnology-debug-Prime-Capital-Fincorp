@@ -78,24 +78,18 @@ export const NAV_SECTIONS: NavSection[] = [
         roles: [ROLE.ADMIN, ROLE.AGENT],
       },
       {
-        label: "Credit Card Banks",
-        href: "/credit-card-banks",
-        icon: CreditCard,
-        roles: [ROLE.ADMIN],
-      },
-      {
         label: "Savings Accounts",
         href: "/savings",
         icon: PiggyBank,
         roles: [ROLE.ADMIN, ROLE.AGENT],
       },
-      {
-        label: "EMIs",
-        href: "/emis",
-        icon: CalendarClock,
-        roles: [ROLE.ADMIN, ROLE.AGENT],
-        badge: "upcoming-emi",
-      },
+      // {
+      //   label: "EMIs",
+      //   href: "/emis",
+      //   icon: CalendarClock,
+      //   roles: [ROLE.ADMIN, ROLE.AGENT],
+      //   badge: "upcoming-emi",
+      // },
     ],
   },
   {

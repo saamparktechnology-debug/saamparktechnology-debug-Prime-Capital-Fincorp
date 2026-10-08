@@ -189,15 +189,15 @@ const DashboardModel = {
     const scope = agentScope(role, agentId, "l");
     const [rows] = await pool.query(
       `SELECT l.loan_id, l.customer_id, l.loan_type, l.requested_amount,
-            l.approved_amount, l.loan_status, l.created_at,
-            c.first_name, c.last_name, c.primary_phone,
-            b.bank_name
-     FROM loans l
-     JOIN customers c ON l.customer_id = c.customer_id
-     LEFT JOIN banks b ON l.bank_id = b.bank_id
-     WHERE 1=1 ${scope.clause}
-     ORDER BY l.created_at DESC
-     LIMIT ?`,
+       l.approved_amount, l.loan_status, l.created_at,
+       l.customer_full_name AS first_name, '' AS last_name,
+       l.customer_phone AS primary_phone,
+       b.bank_name
+FROM loans l
+LEFT JOIN banks b ON l.bank_id = b.bank_id
+WHERE 1=1 ${scope.clause}
+ORDER BY l.created_at DESC
+LIMIT ?`,
       [...scope.params, limit],
     );
     return rows;
