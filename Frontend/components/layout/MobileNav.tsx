@@ -17,7 +17,7 @@ export function MobileNav({ onNavigate }: { onNavigate?: () => void }) {
 
   const { data: company } = useCompany();
   const logoUrl = company?.logo_path ? documentUrl(company.logo_path) : null;
-  const companyName = company?.company_name || "BSA Microfinance";
+  const companyName = company?.company_name || "Prime Capital Fincorp";
   const tagline = company?.tagline || "Better Credit, Brighter Future";
 
   return (
