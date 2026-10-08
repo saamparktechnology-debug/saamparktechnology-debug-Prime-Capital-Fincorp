@@ -1,0 +1,92 @@
+# ============================================
+# Node.js
+# ============================================
+node_modules/
+node_modules
+*/node_modules/
+*/node_modules
+**/node_modules/
+
+# ============================================
+# Environment Variables
+# ============================================
+.env
+.env.*
+!.env.example
+*/.env
+*/.env.*
+!*/.env.example
+
+# ============================================
+# Logs
+# ============================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================
+# Build Outputs
+# ============================================
+dist/
+build/
+out/
+.next/
+next-env.d.ts
+.turbo/
+*.tsbuildinfo
+
+# ============================================
+# Uploads (user-generated content)
+# ============================================
+
+
+# ============================================
+# IDE / Editors
+# ============================================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================================
+# Testing / Coverage
+# ============================================
+coverage/
+.nyc_output/
+*.lcov
+
+# ============================================
+# Package Manager Lock
+# ============================================
+# Keep lockfiles committed (recommended)
+# Uncomment below only if you want to ignore them
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
+# ============================================
+# Cache
+# ============================================
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
+.npm/
+
+# ============================================
+# Misc
+# ============================================
+*.pid
+*.seed
+*.pid.lock
+.pnp.*
+.pnp.js
