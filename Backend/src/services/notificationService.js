@@ -33,7 +33,7 @@ const NotificationService = {
       }
 
       const info = await transporter.sendMail({
-        from: `"BSA Microfinance" <${process.env.EMAIL_USER}>`,
+        from: `"Prime Capital Fincorp" <${process.env.EMAIL_USER}>`,
         to,
         subject,
         html: htmlContent,
