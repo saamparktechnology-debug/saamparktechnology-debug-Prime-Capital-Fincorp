@@ -15,6 +15,10 @@ export interface Loan {
   bank_id?: number | null;
   bank_name?: string | null;
   bank_short_code?: string | null;
+  aadhaar_doc_path?: string | null;
+  pan_doc_path?: string | null;
+  business_reg_doc_path?: string | null;
+  bank_statement_doc_path?: string | null;
 
   // Joined fields
   first_name?: string | null; // ← NEW
