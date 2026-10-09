@@ -1,12 +1,20 @@
-//Frontend/modules/loans/LoanDetail.tsx
-
+//Frontend/modules/credit-cards/CreditCardDetail.tsx
 "use client";
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FileText, ExternalLink, Upload, Trash2, Loader2 } from "lucide-react";
+import {
+  FileText,
+  ExternalLink,
+  Upload,
+  Trash2,
+  Loader2,
+  Building2,
+  CreditCard as CreditCardIcon,
+  Landmark,
+} from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -16,71 +24,46 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { Separator } from "@/components/ui/separator";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api, unwrap, getErrorMessage } from "@/lib/api/client";
-import {
-  formatCurrency,
-  formatDate,
-  getInitials,
-  documentUrl,
-} from "@/lib/format";
+import { formatDate, getInitials, documentUrl } from "@/lib/format";
 import { usePermission } from "@/lib/hooks/usePermission";
-import { useLoansList } from "./hooks/useLoans";
-import { useEmisByLoan } from "@/modules/emis/hooks/useEmis";
+import { useCreditCardApplications } from "./hooks/useCreditCards";
 import {
-  useLoanDocumentChecklist,
-  useUploadLoanDocument,
-  useDeleteLoanDocument,
-} from "./hooks/useLoanDocuments";
-import { LoanStatusTimeline } from "./components/LoanStatusTimeline";
-import { EMIScheduleTable } from "./components/EMIScheduleTable";
-import { LoanStatusModal } from "./modals/LoanStatusModal";
-import type { Loan } from "./types";
-
-const isBusinessType = (t: string) => t === "Business" || t === "Business Loan";
-
-/** Statuses in which the backend allows document mutations */
-const EDITABLE_STATUSES = ["Draft", "Applied", "Under Review"];
+  useCcChecklist,
+  useUploadCcDocument,
+  useDeleteCcDocument,
+} from "./hooks/useCreditCards";
+import { UpdateCCStatusModal } from "./modals/UpdateCCStatusModal";
+import { cardTypeLabel } from "./utils/cardTypes";
 
 const MAX_SIZE_MB = 5;
 const ACCEPTED = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
 
-export default function LoanDetail() {
+/** Backend only allows doc mutations when status === "initiated" */
+const DOC_EDITABLE_STATUS = "initiated";
+
+export default function CreditCardDetail() {
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const { isAdmin } = usePermission();
+
   const [statusOpen, setStatusOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const qc = useQueryClient();
 
-  // ---- ALL HOOKS MUST RUN UNCONDITIONALLY ----
-  const { data: loans, isLoading } = useLoansList();
-  const loan = loans?.find((l) => l.loan_id === id);
-  const { data: emis } = useEmisByLoan(id);
+  // ---- Hooks must run unconditionally ----
+  const appsQ = useCreditCardApplications();
+  const allApps = appsQ.data ?? [];
+  const app = allApps.find((a) => a.application_id === id);
 
-  const isBusiness = loan ? isBusinessType(loan.loan_type) : false;
+  const isFd = app?.card_type === "fd";
 
-  // Document checklist — only relevant for Business loans
-  const checklistQ = useLoanDocumentChecklist(isBusiness ? id : undefined);
-  const uploadM = useUploadLoanDocument(id);
-  const deleteM = useDeleteLoanDocument(id);
+  const checklistQ = useCcChecklist(isFd ? id : undefined);
+  const uploadM = useUploadCcDocument(id);
+  const deleteM = useDeleteCcDocument(id);
 
-  const generateM = useMutation({
-    mutationFn: async () => {
-      const res = await api.post(`/loans/${id}/generate-emis`);
-      return unwrap(res);
-    },
-    onSuccess: (data: any) => {
-      toast.success(data?.message || "EMI schedule generated.");
-      qc.invalidateQueries({ queryKey: ["emis"] });
-      qc.invalidateQueries({ queryKey: ["loans"] });
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  // ---- Early returns ----
-  if (isLoading) {
+  // ---- Loading / not found ----
+  if (appsQ.isLoading) {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-64" />
@@ -89,55 +72,42 @@ export default function LoanDetail() {
     );
   }
 
-  if (!loan) {
+  if (!app) {
     return (
       <div className="space-y-4">
-        <PageHeader title="Loan not found" />
+        <PageHeader title="Application not found" />
         <p className="text-sm text-muted-foreground">
-          The loan may have been removed or you don't have access.
+          The application may have been removed or you don't have access.
         </p>
-        <Link href="/loans" className={buttonVariants({ variant: "outline" })}>
-          Back to Loans
+        <Link
+          href="/credit-cards"
+          className={buttonVariants({ variant: "outline" })}
+        >
+          Back to Applications
         </Link>
       </div>
     );
   }
 
-  const canGenerateEmis =
-    isAdmin &&
-    ["Disbursed", "Active"].includes(loan.loan_status) &&
-    (!emis || emis.length === 0);
+  const canEditDocs = isFd && app.status === DOC_EDITABLE_STATUS;
 
-  const canEditDocuments =
-    isBusiness && EDITABLE_STATUSES.includes(loan.loan_status);
+  const TypeIcon = isFd ? Landmark : CreditCardIcon;
+  const typeAccent = isFd
+    ? "bg-violet-500/10 text-violet-600 dark:text-violet-400"
+    : "bg-blue-500/10 text-blue-600 dark:text-blue-400";
 
-  const displayName = loan.customer_full_name || `Loan #${loan.loan_id}`;
-
-  // When the checklist hasn't loaded yet, fall back to the loan's own *_doc_path fields
   const docItems = checklistQ.data?.checklist ?? [
     {
-      doc_type: "aadhaar",
+      doc_type: "aadhaar" as const,
       label: "Aadhaar Card",
-      path: loan.aadhaar_doc_path,
-      uploaded: Boolean(loan.aadhaar_doc_path),
+      path: app.aadhaar_doc_path,
+      uploaded: Boolean(app.aadhaar_doc_path),
     },
     {
-      doc_type: "pan",
+      doc_type: "pan" as const,
       label: "PAN Card",
-      path: loan.pan_doc_path,
-      uploaded: Boolean(loan.pan_doc_path),
-    },
-    {
-      doc_type: "business_reg",
-      label: "Business Registration Proof",
-      path: loan.business_reg_doc_path,
-      uploaded: Boolean(loan.business_reg_doc_path),
-    },
-    {
-      doc_type: "bank_statement",
-      label: "Bank Statement (1 Year)",
-      path: loan.bank_statement_doc_path,
-      uploaded: Boolean(loan.bank_statement_doc_path),
+      path: app.pan_doc_path,
+      uploaded: Boolean(app.pan_doc_path),
     },
   ];
 
@@ -158,23 +128,21 @@ export default function LoanDetail() {
 
   return (
     <div className="space-y-6">
+      <div>
+        <Link
+          href="/credit-cards"
+          className={buttonVariants({ variant: "ghost", size: "sm" })}
+        >
+          ← Back to Applications
+        </Link>
+      </div>
+
       <PageHeader
-        title={`Loan #${loan.loan_id}`}
-        description={`${loan.loan_type} • Applied ${formatDate(loan.created_at)}`}
+        title={`Credit Card #${app.application_id}`}
+        description={`${cardTypeLabel(app.card_type)} • Applied ${formatDate(app.created_at)}`}
         action={
           <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge status={loan.loan_status} />
-
-            {canGenerateEmis && (
-              <Button
-                variant="outline"
-                onClick={() => generateM.mutate()}
-                disabled={generateM.isPending}
-              >
-                {generateM.isPending ? "Generating..." : "Generate EMIs"}
-              </Button>
-            )}
-
+            <StatusBadge status={app.status} />
             {isAdmin && (
               <Button onClick={() => setStatusOpen(true)}>Update Status</Button>
             )}
@@ -183,102 +151,183 @@ export default function LoanDetail() {
       />
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: customer info + timeline */}
+        {/* Left column */}
         <div className="lg:col-span-1 space-y-6">
+          {/* Applicant card */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Customer</CardTitle>
+              <CardTitle className="text-base">Applicant</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3">
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600 text-sm font-semibold text-white">
-                  {getInitials(displayName)}
+                  {getInitials(app.full_name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{displayName}</p>
-                  {loan.customer_phone && (
-                    <p className="truncate text-xs text-muted-foreground">
-                      {loan.customer_phone}
-                    </p>
-                  )}
+                  <p className="truncate text-sm font-medium">
+                    {app.full_name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {app.phone}
+                  </p>
+                </div>
+              </div>
+              <p className="truncate text-xs text-muted-foreground">
+                {app.email}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Type card */}
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Card Type</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${typeAccent}`}
+                >
+                  <TypeIcon className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">
+                    {cardTypeLabel(app.card_type)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isFd ? "Fixed Deposit backed" : "Standard unsecured card"}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
+          {/* Assignment card */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Status</CardTitle>
+              <CardTitle className="text-base">Assignment</CardTitle>
             </CardHeader>
             <CardContent>
-              <LoanStatusTimeline status={loan.loan_status} />
+              {app.applied_from_office || app.agent_id == null ? (
+                <Badge
+                  variant="outline"
+                  className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                >
+                  <Building2 className="mr-1 h-3 w-3" />
+                  Applied from Office
+                </Badge>
+              ) : (
+                <div>
+                  <p className="text-sm font-medium">{app.agent_name || "—"}</p>
+                  {app.agent_email && (
+                    <p className="text-xs text-muted-foreground">
+                      {app.agent_email}
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Right: details + documents + EMI schedule */}
+        {/* Right column */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Applicant details */}
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Loan Details</CardTitle>
+              <CardTitle className="text-base">Applicant Details</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
-              <Row label="Loan Type" value={loan.loan_type} />
-              <Row
-                label="Partner Bank"
-                value={
-                  loan.bank_name
-                    ? `${loan.bank_name}${loan.bank_short_code ? ` (${loan.bank_short_code})` : ""}`
-                    : "—"
-                }
-              />
-              <Row
-                label="Requested Amount"
-                value={formatCurrency(loan.requested_amount)}
-              />
-              <Row
-                label="Approved Amount"
-                value={
-                  loan.approved_amount
-                    ? formatCurrency(loan.approved_amount)
-                    : "—"
-                }
-              />
-              <Row label="Tenure" value={`${loan.tenure_months} months`} />
-              <Row
-                label="Interest Rate"
-                value={`${loan.interest_rate}% p.a.`}
-              />
-              <Row
-                label="Interest Type"
-                value={
-                  loan.interest_type === "flat" ? "Flat" : "Reducing Balance"
-                }
-              />
-              <Row
-                label="Bank Reference"
-                value={loan.bank_reference_number || "—"}
-              />
-              {isAdmin && (
-                <Row
-                  label="Handled by Agent"
-                  value={
-                    loan.agent_id == null
-                      ? "Applied from office"
-                      : loan.agent_name || "—"
-                  }
-                />
+              <Row label="Full Name" value={app.full_name} />
+              <Row label="Phone" value={app.phone} />
+              <Row label="Email" value={app.email} />
+              <Row label="Pincode" value={app.pincode} />
+              <Row label="Aadhaar" value={app.aadhaar_number} />
+              <Row label="PAN" value={app.pan_number} />
+              {app.notes && (
+                <div className="md:col-span-2">
+                  <Row label="Notes" value={app.notes} />
+                </div>
               )}
-              <Row
-                label="Rejection Reason"
-                value={loan.rejection_reason || "—"}
-              />
-              <Row label="Purpose" value={loan.purpose} />
             </CardContent>
           </Card>
 
-          {/* ---------- Documents (Business loans only) ---------- */}
-          {isBusiness && (
+          {/* Partner Bank */}
+          {app.bank_name && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Partner Bank</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-20 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white">
+                    {app.bank_logo_path ? (
+                      <img
+                        src={documentUrl(app.bank_logo_path) ?? ""}
+                        alt={app.bank_name}
+                        className="h-full w-full object-contain p-1"
+                      />
+                    ) : (
+                      <span className="font-bold text-blue-600">
+                        {app.bank_name.slice(0, 2).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold">{app.bank_name}</p>
+                    {app.bank_short_code && (
+                      <p className="text-xs text-muted-foreground">
+                        {app.bank_short_code}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {app.bank_target_audience && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Target Audience
+                      </p>
+                      <p className="whitespace-pre-line text-sm">
+                        {app.bank_target_audience}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {app.bank_documents_required && (
+                  <>
+                    <Separator />
+                    <div>
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Documents Required
+                      </p>
+                      <p className="whitespace-pre-line text-sm">
+                        {app.bank_documents_required}
+                      </p>
+                    </div>
+                  </>
+                )}
+
+                {app.bank_apply_link && (
+                  <a
+                    href={app.bank_apply_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonVariants({ className: "w-full" })}
+                  >
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Open Bank Application
+                  </a>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Documents — FD only */}
+          {isFd && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
                 <CardTitle className="text-base">Documents</CardTitle>
@@ -286,12 +335,12 @@ export default function LoanDetail() {
                   <Badge variant="outline" className="text-[10px]">
                     {uploadedCount} / {docItems.length} uploaded
                   </Badge>
-                  {!canEditDocuments && (
+                  {!canEditDocs && (
                     <Badge
                       variant="outline"
                       className="border-slate-500/30 bg-slate-500/10 text-[10px] text-muted-foreground"
                     >
-                      Locked ({loan.loan_status})
+                      Locked ({app.status})
                     </Badge>
                   )}
                 </div>
@@ -355,14 +404,13 @@ export default function LoanDetail() {
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                              aria-label={`View ${doc.label}`}
                               title="View"
                             >
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           )}
 
-                          {canEditDocuments && (
+                          {canEditDocs && (
                             <>
                               <label
                                 className={
@@ -426,13 +474,31 @@ export default function LoanDetail() {
             </Card>
           )}
 
-          <EMIScheduleTable loanId={loan.loan_id} />
+          {/* Non-FD notice */}
+          {!isFd && (
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="flex gap-3 p-4">
+                <FileText className="mt-0.5 h-4 w-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <p className="text-sm font-medium text-blue-700 dark:text-blue-400">
+                    No document upload for standard cards
+                  </p>
+                  <p className="text-sm text-blue-700/80 dark:text-blue-400/80">
+                    Documents are only required for FD-backed credit cards. For
+                    this application, complete the process on the bank's site.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
       {isAdmin && (
-        <LoanStatusModal
-          loan={loan}
+        <UpdateCCStatusModal
+          applicationId={app.application_id}
+          customerName={app.full_name}
+          currentStatus={app.status}
           open={statusOpen}
           onOpenChange={setStatusOpen}
         />

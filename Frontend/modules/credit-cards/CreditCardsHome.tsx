@@ -1,4 +1,4 @@
-// modules/credit-cards/CreditCardsHome.tsx
+// Frontend/modules/credit-cards/CreditCardsHome.tsx
 "use client";
 
 import { useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   RefreshCw,
   Building2,
+  Eye,
 } from "lucide-react";
 
 import { PageHeader } from "@/components/shared/PageHeader";
@@ -33,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -44,6 +46,7 @@ import { UpdateCCStatusModal } from "./modals/UpdateCCStatusModal";
 import { useCreditCardApplications } from "./hooks/useCreditCards";
 import { cardTypeLabel } from "./utils/cardTypes";
 import type { CreditCardApplication } from "./types";
+import Link from "next/link";
 
 const STATUS_OPTIONS: SelectOption[] = [
   { value: "all", tag: "All Statuses" },
@@ -270,6 +273,16 @@ export default function CreditCardsHome() {
                           }
                         />
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem
+                            render={
+                              <Link
+                                href={`/credit-cards/${app.application_id}`}
+                              />
+                            }
+                          >
+                            <Eye className="mr-2 h-4 w-4" />
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setStatusTarget(app)}
                           >
