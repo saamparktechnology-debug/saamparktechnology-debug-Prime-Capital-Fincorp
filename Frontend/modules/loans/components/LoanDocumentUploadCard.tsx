@@ -59,9 +59,11 @@ export function LoanDocumentUploadCard({
     <Card
       className={cn(
         "transition-colors",
-        item.uploaded
-          ? "border-emerald-500/30 bg-emerald-500/5"
-          : "border-amber-500/30 bg-amber-500/5",
+        disabled && !item.uploaded
+          ? "border-slate-500/30 bg-muted/30 opacity-70"
+          : item.uploaded
+            ? "border-emerald-500/30 bg-emerald-500/5"
+            : "border-amber-500/30 bg-amber-500/5",
       )}
     >
       <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -71,7 +73,9 @@ export function LoanDocumentUploadCard({
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
               item.uploaded
                 ? "bg-emerald-500/10 text-emerald-600"
-                : "bg-amber-500/10 text-amber-600",
+                : disabled
+                  ? "bg-slate-500/10 text-slate-500"
+                  : "bg-amber-500/10 text-amber-600",
             )}
           >
             {item.uploaded ? (
@@ -144,6 +148,7 @@ export function LoanDocumentUploadCard({
             type="file"
             accept=".pdf,.jpg,.jpeg,.png"
             className="hidden"
+            disabled={disabled}
             onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
           />
           <Button

@@ -57,6 +57,7 @@ const createApplication = async (req, res) => {
     const {
       card_type,
       bank_id,
+      fd_amount,
       agent_id,
       full_name,
       email,
@@ -84,6 +85,18 @@ const createApplication = async (req, res) => {
         });
       }
       resolvedBankId = Number(bank_id);
+    }
+    // FD cards require an FD amount; normal cards must not have one
+    let resolvedFdAmount = null;
+    if (card_type === "fd") {
+      const fd = Number(fd_amount);
+      if (!fd_amount || Number.isNaN(fd) || fd <= 0) {
+        return res.status(400).json({
+          status: "fail",
+          message: "fd_amount is required for FD credit cards.",
+        });
+      }
+      resolvedFdAmount = fd;
     }
 
     if (
@@ -141,6 +154,7 @@ const createApplication = async (req, res) => {
       pan_number: pan_number.trim().toUpperCase(),
       pincode,
       notes,
+      fd_amount: resolvedFdAmount,
     });
 
     audit(req, "create", "credit_card_application", appId, null, {

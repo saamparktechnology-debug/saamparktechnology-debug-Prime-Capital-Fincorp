@@ -85,13 +85,14 @@ const CreditCardModel = {
   async createApplication(data) {
     const [result] = await pool.query(
       `INSERT INTO credit_card_applications 
-        (card_type, bank_id, agent_id, applied_from_office,
+        (card_type, fd_amount, bank_id, agent_id, applied_from_office,
          full_name, email, phone,
          aadhaar_number, pan_number, pincode,
          status, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'initiated', ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'initiated', ?)`,
       [
         data.card_type,
+        data.fd_amount || null,
         data.bank_id,
         data.agent_id || null,
         data.applied_from_office ? 1 : 0,

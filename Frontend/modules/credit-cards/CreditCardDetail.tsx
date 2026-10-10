@@ -26,7 +26,12 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Separator } from "@/components/ui/separator";
 
-import { formatDate, getInitials, documentUrl } from "@/lib/format";
+import {
+  formatDate,
+  getInitials,
+  documentUrl,
+  formatCurrency,
+} from "@/lib/format";
 import { usePermission } from "@/lib/hooks/usePermission";
 import { useCreditCardApplications } from "./hooks/useCreditCards";
 import {
@@ -248,6 +253,9 @@ export default function CreditCardDetail() {
                 <div className="md:col-span-2">
                   <Row label="Notes" value={app.notes} />
                 </div>
+              )}
+              {isFd && app.fd_amount != null && (
+                <Row label="FD Amount" value={formatCurrency(app.fd_amount)} />
               )}
             </CardContent>
           </Card>

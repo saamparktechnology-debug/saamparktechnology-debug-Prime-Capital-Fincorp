@@ -5,19 +5,22 @@ const LoanModel = require("../models/loanModel");
 const audit = require("../utils/auditLog");
 const { toRelativeUploadPath, toAbsolutePath } = require("../utils/filePaths");
 
-// Map URL param → DB column
 const DOC_FIELD_MAP = {
   aadhaar: "aadhaar_doc_path",
+  aadhaar_back: "aadhaar_back_doc_path",
   pan: "pan_doc_path",
   business_reg: "business_reg_doc_path",
   bank_statement: "bank_statement_doc_path",
+  nominee: "nominee_doc_path",
 };
 
 const DOC_LABELS = {
-  aadhaar: "Aadhaar Card",
+  aadhaar: "Aadhaar Card (Front)",
+  aadhaar_back: "Aadhaar Card (Back)",
   pan: "PAN Card",
   business_reg: "Business Registration Proof",
   bank_statement: "Bank Statement 1 Year",
+  nominee: "Nominee Document",
 };
 
 /**
@@ -219,9 +222,15 @@ const getDocumentChecklist = async (req, res) => {
     const checklist = [
       {
         doc_type: "aadhaar",
-        label: "Aadhaar Card",
+        label: "Aadhaar Card (Front)",
         path: loan.aadhaar_doc_path,
         uploaded: Boolean(loan.aadhaar_doc_path),
+      },
+      {
+        doc_type: "aadhaar_back",
+        label: "Aadhaar Card (Back)",
+        path: loan.aadhaar_back_doc_path,
+        uploaded: Boolean(loan.aadhaar_back_doc_path),
       },
       {
         doc_type: "pan",
@@ -240,6 +249,12 @@ const getDocumentChecklist = async (req, res) => {
         label: "Bank Statement 1 Year",
         path: loan.bank_statement_doc_path,
         uploaded: Boolean(loan.bank_statement_doc_path),
+      },
+      {
+        doc_type: "nominee",
+        label: "Nominee Document",
+        path: loan.nominee_doc_path,
+        uploaded: Boolean(loan.nominee_doc_path),
       },
     ];
 

@@ -6,7 +6,8 @@ export interface CreditCardApplication {
   card_type: CardType;
   bank_id: number | null;
   agent_id: number | null;
-  applied_from_office: number; // 0 or 1
+  applied_from_office: number;
+  fd_amount: number | null;
   full_name: string;
   email: string;
   phone: string;
@@ -35,6 +36,7 @@ export interface CreateCreditCardApplicationPayload {
   card_type: CardType;
   bank_id?: number | null; // required for "normal", ignored for "fd"
   agent_id?: number | null;
+  fd_amount?: number | null;
   full_name: string;
   email: string;
   phone: string;

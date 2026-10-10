@@ -117,9 +117,15 @@ export default function LoanDetail() {
   const docItems = checklistQ.data?.checklist ?? [
     {
       doc_type: "aadhaar",
-      label: "Aadhaar Card",
+      label: "Aadhaar Card (Front)",
       path: loan.aadhaar_doc_path,
       uploaded: Boolean(loan.aadhaar_doc_path),
+    },
+    {
+      doc_type: "aadhaar_back",
+      label: "Aadhaar Card (Back)",
+      path: loan.aadhaar_back_doc_path,
+      uploaded: Boolean(loan.aadhaar_back_doc_path),
     },
     {
       doc_type: "pan",
@@ -129,7 +135,7 @@ export default function LoanDetail() {
     },
     {
       doc_type: "business_reg",
-      label: "Business Registration Proof",
+      label: "Business Registration Proof/Uddyam",
       path: loan.business_reg_doc_path,
       uploaded: Boolean(loan.business_reg_doc_path),
     },
@@ -138,6 +144,12 @@ export default function LoanDetail() {
       label: "Bank Statement (1 Year)",
       path: loan.bank_statement_doc_path,
       uploaded: Boolean(loan.bank_statement_doc_path),
+    },
+    {
+      doc_type: "nominee",
+      label: "Nominee Document",
+      path: loan.nominee_doc_path,
+      uploaded: Boolean(loan.nominee_doc_path),
     },
   ];
 
@@ -276,6 +288,20 @@ export default function LoanDetail() {
               <Row label="Purpose" value={loan.purpose} />
             </CardContent>
           </Card>
+
+          {/* Nominee — Business loans only */}
+          {isBusiness && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Nominee</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3 md:grid-cols-2">
+                <Row label="Nominee Name" value={loan.nominee_name} />
+                <Row label="Relationship" value={loan.nominee_relationship} />
+                <Row label="Nominee Mobile" value={loan.nominee_phone} />
+              </CardContent>
+            </Card>
+          )}
 
           {/* ---------- Documents (Business loans only) ---------- */}
           {isBusiness && (

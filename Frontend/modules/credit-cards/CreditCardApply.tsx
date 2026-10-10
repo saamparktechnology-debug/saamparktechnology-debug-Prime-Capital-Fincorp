@@ -65,6 +65,7 @@ const schema = z
   .object({
     card_type: z.enum(["fd", "normal"]),
     bank_id: z.number().optional(),
+    fd_amount: z.coerce.number().positive().optional(),
     full_name: z.string().min(2, "Full name is required"),
     email: z.string().email("Enter a valid email"),
     phone: z.string().regex(phoneRegex, "Enter a valid phone"),
@@ -83,6 +84,25 @@ const schema = z
         path: ["bank_id"],
         message: "Please choose a bank.",
       });
+    }
+  })
+  .superRefine((data, ctx) => {
+    if (data.card_type === "normal" && !data.bank_id) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["bank_id"],
+        message: "Please choose a bank.",
+      });
+    }
+    if (data.card_type === "fd") {
+      const v = Number(data.fd_amount);
+      if (!data.fd_amount || Number.isNaN(v) || v <= 0) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["fd_amount"],
+          message: "FD amount is required for FD credit cards.",
+        });
+      }
     }
   });
 
@@ -301,6 +321,7 @@ function CreditCardApplyInner() {
       pan_number: "",
       pincode: "",
       agent_id: undefined,
+      fd_amount: undefined,
     },
     mode: "onSubmit",
   });
@@ -333,9 +354,9 @@ function CreditCardApplyInner() {
   const handleCardTypeChange = (value: CardType) => {
     form.setValue("card_type", value, { shouldValidate: true });
     if (value === "fd") {
-      form.setValue("bank_id", undefined, { shouldValidate: true });
+      form.setValue("bank_id", undefined);
     } else {
-      form.setValue("bank_id", undefined, { shouldValidate: true });
+      form.setValue("fd_amount", undefined);
     }
   };
 
@@ -343,6 +364,8 @@ function CreditCardApplyInner() {
     createM.mutate(
       {
         card_type: values.card_type,
+        fd_amount:
+          values.card_type === "fd" ? Number(values.fd_amount) : undefined,
         bank_id: values.card_type === "normal" ? values.bank_id : undefined,
         full_name: values.full_name,
         email: values.email,
@@ -629,6 +652,28 @@ function CreditCardApplyInner() {
                 {errors.bank_id && (
                   <p className="text-xs text-destructive">
                     {errors.bank_id.message}
+                  </p>
+                )}
+              </div>
+            )}
+            {/* FD amount — only for FD cards */}
+            {selectedCardType === "fd" && (
+              <div className="space-y-2">
+                <Label htmlFor="fd_amount" className="text-sm font-medium">
+                  FD Amount (₹) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="fd_amount"
+                  type="number"
+                  inputMode="numeric"
+                  placeholder="50000"
+                  {...form.register("fd_amount", {
+                    setValueAs: (v) => (v === "" ? undefined : Number(v)),
+                  })}
+                />
+                {errors.fd_amount && (
+                  <p className="text-xs text-destructive">
+                    {errors.fd_amount.message}
                   </p>
                 )}
               </div>

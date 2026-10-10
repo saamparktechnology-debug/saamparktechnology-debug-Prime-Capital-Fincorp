@@ -19,7 +19,7 @@ const createLoan = async (req, res) => {
     purpose,
     aadhaar_number,
     pan_number,
-    // Business fields
+    // Business
     business_name,
     business_type_id,
     business_category_id,
@@ -31,7 +31,7 @@ const createLoan = async (req, res) => {
     business_city,
     business_state,
     business_pincode,
-    // Client fields
+    // Client
     client_dob,
     client_marital_status,
     client_spouse_name,
@@ -42,9 +42,12 @@ const createLoan = async (req, res) => {
     client_city,
     client_state,
     client_pincode,
+    // Nominee
+    nominee_name,
+    nominee_relationship,
+    nominee_phone,
   } = req.body;
 
-  // ---- Required fields ----
   if (
     !full_name ||
     !phone ||
@@ -75,8 +78,8 @@ const createLoan = async (req, res) => {
       .json({ status: "fail", message: "Invalid PAN number." });
   }
 
-  // ---- Business-specific validation ----
   const isBusiness = loan_type === "Business" || loan_type === "Business Loan";
+
   if (isBusiness) {
     const requiredBusiness = [
       ["business_name", business_name],
@@ -96,6 +99,10 @@ const createLoan = async (req, res) => {
       ["client_city", client_city],
       ["client_state", client_state],
       ["client_pincode", client_pincode],
+      // Nominee — text fields required
+      ["nominee_name", nominee_name],
+      ["nominee_relationship", nominee_relationship],
+      ["nominee_phone", nominee_phone],
     ];
     const missing = requiredBusiness
       .filter(([, v]) => v === undefined || v === null || v === "")
@@ -109,12 +116,11 @@ const createLoan = async (req, res) => {
   }
 
   try {
-    // ---- Determine agent ----
     let agentId;
     if (req.user.role === "agent") {
       agentId = req.user.id;
     } else if (req.user.role === "admin") {
-      agentId = req.body.agent_id ?? null; // admin can leave blank
+      agentId = req.body.agent_id ?? null;
     } else {
       return res
         .status(403)
@@ -134,7 +140,6 @@ const createLoan = async (req, res) => {
         purpose,
         aadhaar_number: aadhaar_number.trim(),
         pan_number: pan_number.trim().toUpperCase(),
-        // Business
         business_name: isBusiness ? business_name : null,
         business_type_id: isBusiness ? business_type_id : null,
         business_category_id: isBusiness ? business_category_id : null,
@@ -146,7 +151,6 @@ const createLoan = async (req, res) => {
         business_city: isBusiness ? business_city : null,
         business_state: isBusiness ? business_state : null,
         business_pincode: isBusiness ? business_pincode : null,
-        // Client
         client_dob: isBusiness ? client_dob : null,
         client_marital_status: isBusiness ? client_marital_status : null,
         client_spouse_name: isBusiness ? client_spouse_name : null,
@@ -157,6 +161,9 @@ const createLoan = async (req, res) => {
         client_city: isBusiness ? client_city : null,
         client_state: isBusiness ? client_state : null,
         client_pincode: isBusiness ? client_pincode : null,
+        nominee_name: isBusiness ? nominee_name : null,
+        nominee_relationship: isBusiness ? nominee_relationship : null,
+        nominee_phone: isBusiness ? nominee_phone : null,
       },
       agentId,
     );
@@ -250,6 +257,9 @@ const updateLoan = async (req, res) => {
       client_city: b.client_city ?? loan.client_city,
       client_state: b.client_state ?? loan.client_state,
       client_pincode: b.client_pincode ?? loan.client_pincode,
+      nominee_name: b.nominee_name ?? loan.nominee_name,
+      nominee_relationship: b.nominee_relationship ?? loan.nominee_relationship,
+      nominee_phone: b.nominee_phone ?? loan.nominee_phone,
     });
 
     if (!success) {

@@ -4,7 +4,13 @@ import { api, unwrap } from "@/lib/api/client";
 const LOANS_BASE = "/loans";
 
 export interface DocumentChecklistItem {
-  doc_type: "aadhaar" | "pan" | "business_reg" | "bank_statement";
+  doc_type:
+    | "aadhaar"
+    | "aadhaar_back"
+    | "pan"
+    | "business_reg"
+    | "bank_statement"
+    | "nominee";
   label: string;
   path: string | null;
   uploaded: boolean;

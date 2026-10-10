@@ -22,6 +22,7 @@ const LoanModel = {
         business_address, business_landmark, business_city, business_state, business_pincode,
         client_dob, client_marital_status, client_spouse_name, client_mother_name,
         client_alternate_phone, client_address, client_landmark, client_city, client_state, client_pincode,
+        nominee_name, nominee_relationship, nominee_phone,
         loan_status
       )
       VALUES (
@@ -34,6 +35,7 @@ const LoanModel = {
         ?, ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?, ?, ?,
+        ?, ?, ?,
         ?
       )
     `;
@@ -71,6 +73,9 @@ const LoanModel = {
       loanData.client_city || null,
       loanData.client_state || null,
       loanData.client_pincode || null,
+      loanData.nominee_name || null,
+      loanData.nominee_relationship || null,
+      loanData.nominee_phone || null,
       "Applied",
     ];
 
@@ -125,7 +130,10 @@ const LoanModel = {
           client_landmark = COALESCE(?, client_landmark),
           client_city = COALESCE(?, client_city),
           client_state = COALESCE(?, client_state),
-          client_pincode = COALESCE(?, client_pincode)
+          client_pincode = COALESCE(?, client_pincode),
+          nominee_name = COALESCE(?, nominee_name),
+          nominee_relationship = COALESCE(?, nominee_relationship),
+          nominee_phone = COALESCE(?, nominee_phone),
       WHERE loan_id = ? AND loan_status IN ('Draft', 'Applied', 'Under Review')
     `;
     const [result] = await pool.query(query, [
@@ -160,6 +168,9 @@ const LoanModel = {
       loanData.client_state ?? null,
       loanData.client_pincode ?? null,
       loanId,
+      loanData.nominee_name ?? null,
+      loanData.nominee_relationship ?? null,
+      loanData.nominee_phone ?? null,
     ]);
     return result.affectedRows > 0;
   },
@@ -192,15 +203,14 @@ const LoanModel = {
     return result.affectedRows > 0;
   },
 
-  /**
-   * Update a specific business document path on the loan
-   */
   async updateDocumentPath(loanId, docField, path) {
     const allowed = [
       "aadhaar_doc_path",
+      "aadhaar_back_doc_path",
       "pan_doc_path",
       "business_reg_doc_path",
       "bank_statement_doc_path",
+      "nominee_doc_path",
     ];
     if (!allowed.includes(docField)) return false;
 

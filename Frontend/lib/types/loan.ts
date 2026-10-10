@@ -25,6 +25,14 @@ export interface Loan {
   last_name?: string | null; // ← NEW
   primary_phone?: string | null; // ← NEW
   agent_name?: string | null; // ← NEW
+  // New document fields
+  aadhaar_back_doc_path?: string | null;
+  nominee_doc_path?: string | null;
+
+  // Nominee
+  nominee_name?: string | null;
+  nominee_relationship?: string | null;
+  nominee_phone?: string | null;
 
   requested_amount: number;
   approved_amount?: number | null;
@@ -51,6 +59,9 @@ export interface CreateLoanPayload {
   interest_type: InterestType;
   purpose: string;
   agent_id?: number;
+  nominee_name?: string;
+  nominee_relationship?: string;
+  nominee_phone?: string;
 }
 
 export interface UpdateLoanPayload {

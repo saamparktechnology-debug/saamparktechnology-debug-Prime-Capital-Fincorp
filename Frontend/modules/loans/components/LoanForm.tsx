@@ -130,6 +130,10 @@ const baseSchema = z.object({
   client_city: z.string().optional(),
   client_state: z.string().optional(),
   client_pincode: z.string().optional(),
+  // Nominee
+  nominee_name: z.string().optional(),
+  nominee_relationship: z.string().optional(),
+  nominee_phone: z.string().optional(),
 });
 
 const schema = baseSchema.superRefine((data, ctx) => {
@@ -146,6 +150,9 @@ const schema = baseSchema.superRefine((data, ctx) => {
     ["business_city", "Business city is required"],
     ["business_state", "Business state is required"],
     ["business_pincode", "Business pincode is required"],
+    ["nominee_name", "Nominee name is required"],
+    ["nominee_relationship", "Nominee relationship is required"],
+    ["nominee_phone", "Nominee phone is required"],
   ];
 
   for (const [key, message] of requiredBusiness) {
@@ -268,6 +275,9 @@ export function LoanForm() {
       client_city: "",
       client_state: "",
       client_pincode: "",
+      nominee_name: "",
+      nominee_relationship: "",
+      nominee_phone: "",
     },
   });
 
@@ -1111,6 +1121,68 @@ export function LoanForm() {
                 {form.formState.errors.client_pincode && (
                   <p className="text-xs text-destructive">
                     {form.formState.errors.client_pincode.message}
+                  </p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Nominee (only if Business loan) */}
+        {isBusiness && (
+          <Card className="border-blue-500/30">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                Nominee Details
+                <Badge variant="outline" className="text-[10px]">
+                  Required
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <Separator />
+            <CardContent className="grid gap-4 pt-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label>
+                  Nominee Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  placeholder="Full name"
+                  {...form.register("nominee_name")}
+                />
+                {form.formState.errors.nominee_name && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.nominee_name.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>
+                  Relationship <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  placeholder="e.g., Spouse, Mother"
+                  {...form.register("nominee_relationship")}
+                />
+                {form.formState.errors.nominee_relationship && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.nominee_relationship.message}
+                  </p>
+                )}
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <Label>
+                  Nominee Mobile <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  placeholder="9876543210"
+                  inputMode="tel"
+                  {...form.register("nominee_phone")}
+                />
+                {form.formState.errors.nominee_phone && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.nominee_phone.message}
                   </p>
                 )}
               </div>
